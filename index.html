@@ -77,11 +77,8 @@
       cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; flex-shrink: 0;
     }
     .orb:hover { transform: scale(1.08); }
-    /* Stato standby (in attesa della parola "Zoe") */
     .orb.standby { box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); animation: breathe 3s infinite; }
-    /* Stato attivo (ha sentito "Zoe") */
     .orb.listening { animation: pulse 1s infinite; background: linear-gradient(135deg, #f43f5e, #fb923c); }
-    /* Stato risposta vocale */
     .orb.speaking { animation: pulse 0.8s infinite; background: linear-gradient(135deg, #10b981, #38bdf8); }
     
     @keyframes breathe { 0%, 100% { opacity: 0.75; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1.04); } }
@@ -140,7 +137,7 @@
     </header>
 
     <div id="chat-container">
-      <div class="msg ai-msg">Ciao! Sono Zoe. Pronuncia il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b> o <b>"Zoe, che ore sono?"</b>) oppure scrivimi qui sotto.</div>
+      <div class="msg ai-msg">Ciao! Sono Zoe. Parlami liberamente dicendo il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b>, <b>"Zoe, che tempo fa oggi?"</b>, <b>"Zoe, disegna un gatto cyberpunk"</b>) oppure scrivimi qui sotto.</div>
     </div>
 
     <div id="model-badge"></div>
@@ -161,7 +158,7 @@
     let conteggioImmagini = 0;
     let conteggioImpegni = 0;
     let isSpeaking = false;
-    let ascoltoDiretto = false; // True se hai cliccato la sfera a mano
+    let ascoltoDiretto = false;
 
     const chatContainer = document.getElementById("chat-container");
     const orb = document.getElementById("orb");
@@ -189,9 +186,7 @@
           orb.className = "orb standby";
           micStatus.textContent = 'In attesa di "Zoe"...';
         }
-      } catch (e) {
-        // Già avviato
-      }
+      } catch (e) {}
     }
 
     function forzaAscoltoDiretto() {
@@ -212,7 +207,6 @@
       }
     }
 
-    // Sblocca l'ascolto automatico al caricamento o al primo tocco sulla pagina
     window.addEventListener("load", () => {
       if (ascoltoContinuoCheck.checked) avviaMicrofono();
     });
@@ -224,7 +218,6 @@
       const trascritto = event.results[event.results.length - 1][0].transcript.trim();
       const lower = trascritto.toLowerCase();
 
-      // Se hai cliccato la sfera a mano, accetta tutto subito
       if (ascoltoDiretto) {
         ascoltoDiretto = false;
         orb.className = "orb";
@@ -232,24 +225,20 @@
         return;
       }
 
-      // Altrimenti cerca la parola chiave "Zoe" (o varianti fonetiche comuni come "Zoey" / "Zoi")
       const matchZoe = lower.match(/\b(zoe|zoey|zoi)\b[,\s]*(.*)/i);
       if (matchZoe) {
         orb.className = "orb listening";
         const comando = matchZoe[2].trim();
         
         if (comando.length > 0) {
-          // Hai detto "Zoe" seguito subito dalla domanda nella stessa frase
           processaMessaggio(comando);
         } else {
-          // Hai detto solo "Zoe": attiva l'ascolto diretto per la frase successiva
           ascoltoDiretto = true;
           micStatus.textContent = "Dimmi pure...";
         }
       }
     };
 
-    // Riavvia automaticamente il microfono quando termina una pausa
     recognition.onend = () => {
       if (!isSpeaking && (ascoltoContinuoCheck.checked || ascoltoDiretto)) {
         setTimeout(avviaMicrofono, 200);
@@ -272,12 +261,13 @@
       input.value = "";
       processaMessaggio(testo);
     }
+
     async function processaMessaggio(testo) {
       aggiungiMessaggio(testo, "user-msg");
       const testoLower = testo.toLowerCase();
 
-      // 1. Apertura YouTube libera (es. "metti i rolling stones", "fammi ascoltare...", "suona...")
-      if (testoLower.includes("metti ") || testoLower.includes("ascoltare ") || testoLower.includes("suona ") || (testoLower.includes("Cerca") && testoLower.includes("youtube"))) {
+      // 1. Apertura YouTube libera
+      if (testoLower.includes("metti ") || testoLower.includes("ascoltare ") || testoLower.includes("suona ") || (testoLower.includes("cerca") && testoLower.includes("youtube"))) {
         const ricerca = testo.replace(/metti|su youtube|apri youtube e metti|cerca su youtube|fammi ascoltare|suona/gi, "").trim();
         const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
         window.open(urlYt, "_blank");
@@ -287,7 +277,7 @@
         return;
       }
 
-      // 2. Ricerca Google libera (es. "cerca su google...", "fammi vedere...", "informazioni su...")
+      // 2. Ricerca Google libera
       if (testoLower.startsWith("cerca ") || testoLower.startsWith("cercami ") || testoLower.startsWith("informazioni su ")) {
         const ricerca = testo.replace(/cerca su google|cerca|cercami|informazioni su/gi, "").trim();
         const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
@@ -298,7 +288,7 @@
         return;
       }
 
-      // 3. Gestione automatica di Ora, Data e Meteo a Torino (senza passare dal server)
+      // 3. Ora, Data e Meteo Torino
       if (testoLower.includes("ora") || testoLower.includes("che ore")) {
         const oraCorrente = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
         const msgRisposta = `Sono le ore ${oraCorrente}.`;
@@ -320,7 +310,6 @@
       }
 
       if (testoLower.includes("meteo") || testoLower.includes("tempo fa") || testoLower.includes("previsioni")) {
-        // Apre direttamente il meteo di Torino in una scheda di comodo appoggio
         const urlMeteo = `https://www.google.com/search?q=meteo+torino`;
         window.open(urlMeteo, "_blank");
         const msgRisposta = `Ti ho aperto le previsioni del meteo aggiornate per Torino in una nuova scheda!`;
@@ -329,19 +318,23 @@
         return;
       }
 
-      // 4. Rilevamento impegni / promemoria flessibile
+      // 4. Rilevamento impegni
       if (testoLower.includes("ricordami") || testoLower.includes("impegno") || testoLower.includes("appuntamento") || testoLower.includes("segnati")) {
         conteggioImpegni++;
         statImpegni.textContent = conteggioImpegni;
       }
 
-      // 5. Generazione immagini flessibile (es. "disegnami", "crea un'immagine di", "fammi vedere un disegno di")
+      // 5. Generazione immagini flessibile con pulsante salvataggio
       if (testoLower.startsWith("genera ") || testoLower.startsWith("crea ") || testoLower.startsWith("disegna ") || testoLower.startsWith("fammi un'immagine") || testoLower.startsWith("fammi vedere un'immagine")) {
         const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine|disegna|fammi un'immagine di|fammi un'immagine|fammi vedere un'immagine di|fammi vedere un'immagine/gi, "").trim();
         aggiungiMessaggio(`Sto creando l'immagine per: "${promptImg}"...`, "ai-msg");
         
         const urlImmagine = `https://pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
-        const imgHtml = `<br><img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata">`;
+        const imgHtml = `
+          <br>
+          <img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
+          <a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" style="display:inline-block; padding:6px 12px; background:#3b82f6; color:white; border-radius:6px; text-decoration:none; font-size:0.85rem; font-weight:600;">📥 Salva Immagine sul PC</a>
+        `;
         
         aggiungiMessaggio("Ecco l'immagine generata:" + imgHtml, "ai-msg");
         conteggioImmagini++;
@@ -352,7 +345,7 @@
         return;
       }
 
-      // 6. Conversazione generale libera con l'intelligenza artificiale in cloud
+      // 6. Conversazione generale AI Cloud
       try {
         const res = await fetch(`${SERVER_URL}/chiedi`, {
           method: "POST",
@@ -374,7 +367,6 @@
         aggiungiMessaggio("Errore di connessione al server cloud.", "ai-msg");
       }
     }
-    
 
     function aggiungiMessaggio(testo, classe) {
       const div = document.createElement("div");
