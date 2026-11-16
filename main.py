@@ -2,10 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from litellm import completion
+import os
 
 app = FastAPI()
 
-# Permette alla tua pagina web di comunicare col server cloud
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,39 +15,37 @@ app.add_middleware(
 
 class Richiesta(BaseModel):
     testo: str
-
-# Catena di modelli 100% gratuiti in ordine di priorità
-MODELLI_GRATIS = [
-    "gemini/gemini-2.5-flash",
-    "groq/openai/gpt-oss-120b",
-    "groq/qwen/qwen3.8-27b",
-    "openrouter/google/gemma-4-31b-it:free"
-]
-
-@app.get("/")
-def home():
-    return {"stato": "Assistente Cloud Attivo"}
+    storico: list = []
 
 @app.post("/chiedi")
-def chiedi_ai(dati: Richiesta):
-    try:
-        risposta = completion(
-            model=MODELLI_GRATIS[0],
-            messages=[
-                
-            {
-                "role": "system",
-                "content": "Ti chiami Zoe e sei un assistente personale intelligente, informale e molto elastico. Comprendi qualsiasi formulazione colloquiale. Se l'utente ti chiede l'ora o la data attuale, rispondi usando i riferimenti temporali corretti. Rispondi sempre in italiano in modo naturale, diretto e amichevole."
-            }
-        ],
-            fallbacks=MODELLI_GRATIS[1:]
-        )
-        return {
-            "risposta": risposta.choices[0].message.content,
-            "modello": risposta.model
+async def chiedi(req: Richiesta):
+    messaggi = [
+        {
+            "role": "system",
+            "content": "Ti chiami Zoe e sei un'assistente personale intelligente, simpatica e informale. Rispondi sempre in italiano in modo naturale, diretto e pertinente alla domanda dell'utente."
         }
-    except Exception as e:
-        return {
-            "risposta": "Al momento tutti i modelli gratuiti hanno raggiunto il limite. Riprova tra poco.",
-            "errore": str(e)
-        }
+    ]
+    
+    # Aggiunge lo storico recente (ultimi 6 messaggi per non appesantire)
+    for m in req.storico[-6:]:
+        messaggi.append({"role": m["role"], "content": m["content"]})
+        
+    messaggi.append({"role": "user", "content": req.testo})
+
+    # Modelli gratuiti in cascata (se uno fallisce o è occupato, passa al successivo)
+    modelli = [
+        "groq/llama-3.3-70b-versatile",
+        "gemini/gemini-2.0-flash",
+        "openrouter/google/gemma-2-9b-it:free"
+    ]
+
+    for modello in modelli:
+        try:
+            risposta = completion(model=modello, messages=messaggi)
+            testo_risposta = risposta.choices[0].message.content
+            return {"risposta": testo_risposta, "modello": modello}
+        except Exception as e:
+            print(f"Errore con {modello}: {e}")
+            continue
+
+    return {"risposta": "Ops, al momento i server AI sono un po' intasati. Riprova tra un attimo!", "modello": "nessuno"}
