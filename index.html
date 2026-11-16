@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assistente AI Cloud</title>
+  <style>
+    body {
+      margin: 0; height: 100vh; display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      background: radial-gradient(circle at center, #0f172a, #020617);
+      color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    .orb {
+      width: 140px; height: 140px; border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+      box-shadow: 0 0 40px rgba(56, 189, 248, 0.5);
+      cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .orb:hover { transform: scale(1.06); }
+    .orb.listening {
+      animation: pulse 1.2s infinite;
+      background: linear-gradient(135deg, #f43f5e, #fb923c);
+      box-shadow: 0 0 60px rgba(244, 63, 94, 0.8);
+    }
+    .orb.speaking {
+      animation: pulse 0.8s infinite;
+      background: linear-gradient(135deg, #10b981, #38bdf8);
+      box-shadow: 0 0 60px rgba(16, 185, 129, 0.8);
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    #status { margin-top: 28px; font-size: 1.1rem; color: #94a3b8; }
+    #transcript {
+      margin-top: 16px; max-width: 600px; text-align: center;
+      padding: 0 20px; font-size: 1.2rem; line-height: 1.5;
+    }
+    #model-badge {
+      position: fixed; bottom: 16px; font-size: 0.8rem; color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="orb" id="orb" onclick="avviaAscolto()"></div>
+  <div id="status">Clicca la sfera per parlare</div>
+  <div id="transcript"></div>
+  <div id="model-badge"></div>
+
+  <script>
+    // AL PASSO 3 INCOLLERAI QUI IL LINK DEL TUO SERVER RENDER
+    const SERVER_URL = "INCOLLA_QUI_URL_RENDER";
+
+    const orb = document.getElementById("orb");
+    const statusEl = document.getElementById("status");
+    const transcriptEl = document.getElementById("transcript");
+    const badgeEl = document.getElementById("model-badge");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "it-IT";
+    recognition.interimResults = false;
+
+    function avviaAscolto() {
+      window.speechSynthesis.cancel();
+      orb.className = "orb listening";
+      statusEl.textContent = "Ti ascolto...";
+      recognition.start();
+    }
+
+    recognition.onresult = async (event) => {
+      const testoUtente = event.results[0][0].transcript;
+      transcriptEl.textContent = `Tu: "${testoUtente}"`;
+      orb.className = "orb";
+      statusEl.textContent = "Sto pensando...";
+
+      try {
+        const res = await fetch(`${SERVER_URL}/chiedi`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ testo: testoUtente })
+        });
+        const dati = await res.json();
+        transcriptEl.textContent = dati.risposta;
+        if (dati.modello) badgeEl.textContent = `Modello attivo: ${dati.modello}`;
+        parla(dati.risposta);
+      } catch (err) {
+        statusEl.textContent = "Errore di connessione al server cloud";
+        console.error(err);
+      }
+    };
+
+    recognition.onerror = () => {
+      orb.className = "orb";
+      statusEl.textContent = "Non ho sentito, clicca per riprovare";
+    };
+
+    function parla(testo) {
+      const msg = new SpeechSynthesisUtterance(testo);
+      msg.lang = "it-IT";
+      msg.rate = 1.05;
+      msg.onstart = () => {
+        orb.className = "orb speaking";
+        statusEl.textContent = "Sto rispondendo...";
+      };
+      msg.onend = () => {
+        orb.className = "orb";
+        statusEl.textContent = "Clicca la sfera per parlare";
+      };
+      window.speechSynthesis.speak(msg);
+    }
+  </script>
+</body>
+</html>
