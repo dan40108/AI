@@ -34,11 +34,9 @@ async def chiedi(req: Richiesta):
 
     # Modelli gratuiti in cascata (se uno fallisce o è occupato, passa al successivo)
     modelli = [
+        "gemini/gemini-3.8-flash",
         "groq/llama-3.3-70b-versatile",
-        "groq/llama-3.1-8b-instant",
-        "openrouter/openai/gpt-oss-120b:free",
-        "openrouter/meta-llama/llama-3.3-70b-instruct:free",
-        "gemini/gemini-2.5-flash"
+        "openrouter/openai/gpt-oss-120b:free"
     ]
 
     ultimo_errore = ""
