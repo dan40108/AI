@@ -266,9 +266,9 @@
       aggiungiMessaggio(testo, "user-msg");
       const testoLower = testo.toLowerCase();
 
-      // 1. Apertura YouTube libera
-      if (testoLower.includes("metti ") || testoLower.includes("ascoltare ") || testoLower.includes("suona ") || (testoLower.includes("cerca") && testoLower.includes("youtube"))) {
-        const ricerca = testo.replace(/metti|su youtube|apri youtube e metti|cerca su youtube|fammi ascoltare|suona/gi, "").trim();
+     // 1. Apertura YouTube libera (riconosce "youtube" ovunque o "metti / ascoltare / suona")
+      if (testoLower.includes("youtube") || testoLower.includes("metti ") || testoLower.includes("ascoltare ") || testoLower.includes("suona ")) {
+        const ricerca = testo.replace(/mi cerchi|cercami|cerca|su youtube|youtube|apri|metti|fammi ascoltare|suona|per favore/gi, "").trim();
         const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
         window.open(urlYt, "_blank");
         const msgRisposta = `Certo! Apro YouTube per cercare: "${ricerca}"`;
