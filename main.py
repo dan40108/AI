@@ -17,6 +17,10 @@ class Richiesta(BaseModel):
     testo: str
     storico: list = []
 
+@app.get("/")
+async def home():
+    return {"stato": "Zoe Backend Online"}
+
 @app.post("/chiedi")
 async def chiedi(req: Richiesta):
     messaggi = [
@@ -26,14 +30,12 @@ async def chiedi(req: Richiesta):
         }
     ]
     
-    # Aggiunge lo storico recente (ultimi 6 messaggi per non appesantire)
     for m in req.storico[-6:]:
         messaggi.append({"role": m["role"], "content": m["content"]})
         
     messaggi.append({"role": "user", "content": req.testo})
 
-    # Modelli gratuiti in cascata (se uno fallisce o è occupato, passa al successivo)
-  modelli = [
+    modelli = [
         "openrouter/openrouter/free",
         "groq/llama-3.3-70b-versatile",
         "groq/llama-3.1-8b-instant",
@@ -52,13 +54,3 @@ async def chiedi(req: Richiesta):
             continue
 
     return {"risposta": "Dettaglio errori:\n" + "\n".join(errori), "modello": "nessuno"}
-    for modello in modelli:
-        try:
-            risposta = completion(model=modello, messages=messaggi)
-            testo_risposta = risposta.choices[0].message.content
-            return {"risposta": testo_risposta, "modello": modello}
-        except Exception as e:
-            print(f"Errore con {modello}: {e}")
-            continue
-
-    return {"risposta": "Ops, al momento i server AI sono un po' intasati. Riprova tra un attimo!", "modello": "nessuno"}
