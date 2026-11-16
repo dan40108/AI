@@ -3,86 +3,173 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Siri - AI Cloud</title>
+  <title>Siri & AI - Dashboard</title>
   <style>
+    :root {
+      --bg-main: #090d16;
+      --bg-sidebar: #0e1626;
+      --bg-panel: #131c31;
+      --border-color: #1e293b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0; height: 100vh; display: flex; flex-direction: column;
-      justify-content: space-between; align-items: center;
-      background: radial-gradient(circle at center, #0f172a, #020617);
-      color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;
+      height: 100vh; display: flex;
+      background: var(--bg-main); color: var(--text-main);
+      font-family: system-ui, -apple-system, sans-serif;
       overflow: hidden;
     }
-    header { margin-top: 15px; font-size: 1.2rem; font-weight: 600; letter-spacing: 2px; color: #94a3b8; }
+
+    /* Sidebar delle chat */
+    aside {
+      width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color);
+      display: flex; flex-direction: column; padding: 16px; gap: 16px;
+    }
+    .new-chat-btn {
+      background: var(--accent); color: white; border: none; padding: 12px;
+      border-radius: 8px; font-weight: 600; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;
+    }
+    .new-chat-btn:hover { background: var(--accent-hover); }
     
+    .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .chat-item {
+      padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+      color: var(--text-muted); transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chat-item:hover, .chat-item.active { background: rgba(255,255,255,0.05); color: var(--text-main); }
+
+    /* Area principale */
+    main {
+      flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    }
+
+    /* Topbar con Titolo e Card Riepilogo */
+    header {
+      padding: 16px 24px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 1px; color: var(--text-main); }
+    
+    .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .card {
+      background: var(--bg-panel); border: 1px solid var(--border-color); padding: 10px 14px;
+      border-radius: 8px; display: flex; flex-direction: column; gap: 4px;
+    }
+    .card-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-value { font-size: 1rem; font-weight: 600; color: var(--accent); }
+
+    /* Contenitore della Chat a tutto schermo */
     #chat-container {
-      width: 90%; max-width: 600px; height: 40vh; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 10px; padding: 10px;
-      background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+      flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;
     }
-    .msg { padding: 10px 14px; border-radius: 10px; max-width: 80%; font-size: 0.95rem; line-height: 1.4; }
-    .user-msg { background: #3b82f6; align-self: flex-end; color: white; }
-    .ai-msg { background: #1e293b; align-self: flex-start; color: #e2e8f0; }
-    
-    .center-panel { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+    .msg { padding: 12px 18px; border-radius: 12px; max-width: 75%; font-size: 0.95rem; line-height: 1.5; }
+    .user-msg { background: var(--accent); align-self: flex-end; color: white; }
+    .ai-msg { background: var(--bg-panel); border: 1px solid var(--border-color); align-self: flex-start; color: var(--text-main); }
+
+    /* Barra inferiore (Input, Sfera e Controlli) */
+    .input-footer {
+      padding: 16px 24px; background: var(--bg-sidebar); border-top: 1px solid var(--border-color);
+      display: flex; align-items: center; gap: 16px;
+    }
     .orb {
-      width: 100px; height: 100px; border-radius: 50%;
+      width: 45px; height: 45px; border-radius: 50%;
       background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
-      box-shadow: 0 0 30px rgba(56, 189, 248, 0.4);
-      cursor: pointer; transition: transform 0.3s ease;
-      display: flex; justify-content: center; align-items: center;
+      cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; flex-shrink: 0;
     }
-    .orb:hover { transform: scale(1.05); }
+    .orb:hover { transform: scale(1.08); }
     .orb.listening { animation: pulse 1.2s infinite; background: linear-gradient(135deg, #f43f5e, #fb923c); }
     .orb.speaking { animation: pulse 0.8s infinite; background: linear-gradient(135deg, #10b981, #38bdf8); }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
-    #input-bar {
-      width: 90%; max-width: 600px; display: flex; gap: 10px; margin-bottom: 20px;
+    .input-wrapper {
+      flex: 1; display: flex; background: var(--bg-main); border: 1px solid var(--border-color);
+      border-radius: 8px; overflow: hidden;
     }
     input[type="text"] {
-      flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155;
-      background: #090d16; color: white; font-size: 1rem; outline: none;
+      flex: 1; padding: 12px 16px; border: none; background: transparent; color: white; font-size: 0.95rem; outline: none;
     }
-    button {
-      padding: 0 20px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-weight: 600; cursor: pointer;
+    .send-btn {
+      background: var(--accent); border: none; padding: 0 20px; color: white; font-weight: 600; cursor: pointer; transition: background 0.2s;
     }
-    button:hover { background: #2563eb; }
-    .controls { display: flex; gap: 15px; font-size: 0.9rem; color: #94a3b8; align-items: center; }
-    #generated-image { max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 5px; display: none; }
-    #model-badge { font-size: 0.75rem; color: #475569; margin-bottom: 5px; }
+    .send-btn:hover { background: var(--accent-hover); }
+
+    .controls-panel { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+    #model-badge { font-size: 0.75rem; color: var(--text-muted); padding: 0 24px 8px 24px; text-align: right; }
   </style>
 </head>
 <body>
 
-  <header>SIRI CLOUD</header>
-
-  <!-- Cronologia chat con memoria -->
-  <div id="chat-container">
-    <div class="msg ai-msg">Ciao! Sono pronto. Parlami o scrivimi qui sotto, ricordo tutto quello che ci dicianno e posso anche generare immagini.</div>
-  </div>
-
-  <div class="center-panel">
-    <div class="orb" id="orb" onclick="avviaAscolto()" title="Clicca per parlare"></div>
-    <div class="controls">
-      <label><input type="checkbox" id="voce-attiva" checked> Rispondi a voce</label>
+  <!-- Sidebar Gestione Chat -->
+  <aside>
+    <button class="new-chat-btn" onclick="nuovaChat()">+ Nuova Chat</button>
+    <div class="chat-list" id="chat-list">
+      <div class="chat-item active">Chat Principale</div>
     </div>
-    <div id="model-badge"></div>
-  </div>
+  </aside>
 
-  <!-- Barra per scrivere testualmente o chiedere immagini -->
-  <div id="input-bar">
-    <input type="text" id="testo-input" placeholder="Scrivi un messaggio o 'genera immagine di...'" onkeydown="if(event.key==='Enter') inviaTesto()">
-    <button onclick="inviaTesto()">Invia</button>
-  </div>
+  <!-- Area Principale Dashboard -->
+  <main>
+    <header>
+      <div class="header-top">
+        <h1>SIRI & AI</h1>
+        <div class="controls-panel">
+          <label><input type="checkbox" id="voce-attiva" checked> Voce</label>
+        </div>
+      </div>
+      <!-- Card Riepilogo in alto -->
+      <div class="summary-cards">
+        <div class="card">
+          <span class="card-title">Chat Attive</span>
+          <span class="card-value" id="stat-chat">1</span>
+        </div>
+        <div class="card">
+          <span class="card-title">Impegni / Promemoria</span>
+          <span class="card-value" id="stat-impegni">0</span>
+        </div>
+        <div class="card">
+          <span class="card-title">Immagini Generate</span>
+          <span class="card-value" id="stat-immagini">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Chat a tutto schermo -->
+    <div id="chat-container">
+      <div class="msg ai-msg">Ciao Daniele! Dashboard attiva. Come posso aiutarti oggi?</div>
+    </div>
+
+    <div id="model-badge"></div>
+
+    <!-- Barra Footer con Sfera e Input -->
+    <div class="input-footer">
+      <div class="orb" id="orb" onclick="avviaAscolto()" title="Parla con Siri"></div>
+      <div class="input-wrapper">
+        <input type="text" id="testo-input" placeholder="Scrivi un messaggio o 'genera immagine di...'" onkeydown="if(event.key==='Enter') inviaTesto()">
+        <button class="send-btn" onclick="inviaTesto()">Invia</button>
+      </div>
+    </div>
+  </main>
 
   <script>
-    const SERVER_URL = "https://ai-ttmc.onrender.com"; // Il tuo URL Render
+    const SERVER_URL = "https://ai-ttmc.onrender.com";
 
-    let storicoChat = []; // Memoria della conversazione
+    let storicoChat = [];
+    let conteggioImmagini = 0;
+    let conteggioImpegni = 0;
+
     const chatContainer = document.getElementById("chat-container");
     const orb = document.getElementById("orb");
     const badgeEl = document.getElementById("model-badge");
     const voceAttiva = document.getElementById("voce-attiva");
+    const statImmagini = document.getElementById("stat-immagini");
+    const statImpegni = document.getElementById("stat-impegni");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -114,16 +201,26 @@
     async function processaMessaggio(testo) {
       aggiungiMessaggio(testo, "user-msg");
 
-      // Controllo se l'utente vuole generare un'immagine
-      if (testo.toLowerCase().startsWith("genera immagine") || testo.toLowerCase().startsWith("crea immagine")) {
+      // Rilevamento impegni/promemoria al volo
+      if (testo.toLowerCase().includes("ricordami") || testo.toLowerCase().includes("impegno") || testo.toLowerCase().includes("appuntamento")) {
+        conteggioImpegni++;
+        statImpegni.textContent = conteggioImpegni;
+      }
+
+      // Controllo generazione immagini
+      const testoLower = testo.toLowerCase();
+      if (testoLower.startsWith("genera immagine") || testoLower.startsWith("crea immagine")) {
         const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine/gi, "").trim();
         aggiungiMessaggio(`Sto creando l'immagine per: "${promptImg}"...`, "ai-msg");
         
         const urlImmagine = `https://pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
+        const imgHtml = `<br><img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata">`;
         
-        const imgHtml = `<br><img src="${urlImmagine}" id="generated-image" style="display:block;" alt="Immagine generata">`;
         aggiungiMessaggio("Ecco l'immagine generata:" + imgHtml, "ai-msg");
         
+        conteggioImmagini++;
+        statImmagini.textContent = conteggioImmagini;
+
         storicoChat.push({ role: "user", content: testo });
         storicoChat.push({ role: "assistant", content: `Ho generato l'immagine richiesta: ${promptImg}` });
         return;
@@ -140,7 +237,6 @@
         aggiungiMessaggio(dati.risposta, "ai-msg");
         if (dati.modello) badgeEl.textContent = `Modello: ${dati.modello}`;
 
-        // Aggiorna la memoria (storico)
         storicoChat.push({ role: "user", content: testo });
         storicoChat.push({ role: "assistant", content: dati.risposta });
 
@@ -159,30 +255,26 @@
       chatContainer.appendChild(div);
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-function parla(testo) {
+
+    function nuovaChat() {
+      chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Di cosa vogliamo parlare?</div>`;
+      storicoChat = [];
+    }
+
+    function parla(testo) {
       const testoPuro = testo.replace(/<[^>]*>?/gm, '');
       const msg = new SpeechSynthesisUtterance(testoPuro);
       msg.lang = "it-IT";
-      msg.rate = 1.0; // Velocità naturale
-
-      // Recupera le voci disponibili nel browser
+      
       const voci = window.speechSynthesis.getVoices();
-      
-      // Cerca prima una voce femminile specifica in italiano (es. Alice, Elsa, Federica o Google italiano)
-      const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it') || v.name.toLowerCase().includes('female')))
-                          || voci.find(v => v.lang.startsWith('it') && !v.name.toLowerCase().includes('cosimo') && !v.name.toLowerCase().includes('luca') && !v.name.toLowerCase().includes('male'));
-      
-      if (voceFemminile) {
-        msg.voice = voceFemminile;
-      }
+      const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it')))
+                          || voci.find(v => v.lang.startsWith('it'));
+      if (voceFemminile) msg.voice = voceFemminile;
 
       msg.onstart = () => { orb.className = "orb speaking"; };
       msg.onend = () => { orb.className = "orb"; };
       window.speechSynthesis.speak(msg);
     }
-
-    // Assicura il caricamento delle voci
-    if ('onvoiceschanged' in window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
-  
+  </script>
+</body>
+</html>
