@@ -33,25 +33,25 @@ async def chiedi(req: Richiesta):
     messaggi.append({"role": "user", "content": req.testo})
 
     # Modelli gratuiti in cascata (se uno fallisce o è occupato, passa al successivo)
-    modelli = [
-        "gemini/gemini-3.8-flash",
+  modelli = [
+        "openrouter/openrouter/free",
         "groq/llama-3.3-70b-versatile",
-        "openrouter/openai/gpt-oss-120b:free"
+        "groq/llama-3.1-8b-instant",
+        "gemini/gemini-2.0-flash-lite",
+        "openrouter/meta-llama/llama-3.3-70b-instruct:free"
     ]
 
-    ultimo_errore = ""
+    errori = []
     for modello in modelli:
         try:
             risposta = completion(model=modello, messages=messaggi)
             testo_risposta = risposta.choices[0].message.content
             return {"risposta": testo_risposta, "modello": modello}
         except Exception as e:
-            ultimo_errore = str(e)
-            print(f"Errore con {modello}: {e}")
+            errori.append(f"{modello}: {str(e)[:80]}")
             continue
 
-    return {"risposta": f"Errore tecnico server: {ultimo_errore}", "modello": "nessuno"}
-
+    return {"risposta": "Dettaglio errori:\n" + "\n".join(errori), "modello": "nessuno"}
     for modello in modelli:
         try:
             risposta = completion(model=modello, messages=messaggi)
