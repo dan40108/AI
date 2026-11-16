@@ -35,9 +35,24 @@ async def chiedi(req: Richiesta):
     # Modelli gratuiti in cascata (se uno fallisce o è occupato, passa al successivo)
     modelli = [
         "groq/llama-3.3-70b-versatile",
-        "gemini/gemini-2.0-flash",
-        "openrouter/google/gemma-2-9b-it:free"
+        "groq/llama-3.1-8b-instant",
+        "openrouter/openai/gpt-oss-120b:free",
+        "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+        "gemini/gemini-2.5-flash"
     ]
+
+    ultimo_errore = ""
+    for modello in modelli:
+        try:
+            risposta = completion(model=modello, messages=messaggi)
+            testo_risposta = risposta.choices[0].message.content
+            return {"risposta": testo_risposta, "modello": modello}
+        except Exception as e:
+            ultimo_errore = str(e)
+            print(f"Errore con {modello}: {e}")
+            continue
+
+    return {"risposta": f"Errore tecnico server: {ultimo_errore}", "modello": "nessuno"}
 
     for modello in modelli:
         try:
