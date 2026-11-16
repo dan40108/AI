@@ -272,41 +272,72 @@
       input.value = "";
       processaMessaggio(testo);
     }
-
     async function processaMessaggio(testo) {
       aggiungiMessaggio(testo, "user-msg");
       const testoLower = testo.toLowerCase();
 
-      // 1. Azioni Co-work (YouTube / Google)
-      if (testoLower.startsWith("metti ") || testoLower.includes("su youtube")) {
-        const ricerca = testo.replace(/metti|su youtube|apri youtube e metti|cerca su youtube/gi, "").trim();
+      // 1. Apertura YouTube libera (es. "metti i rolling stones", "fammi ascoltare...", "suona...")
+      if (testoLower.includes("metti ") || testoLower.includes("ascoltare ") || testoLower.includes("suona ") || (testoLower.includes("Cerca") && testoLower.includes("youtube"))) {
+        const ricerca = testo.replace(/metti|su youtube|apri youtube e metti|cerca su youtube|fammi ascoltare|suona/gi, "").trim();
         const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
         window.open(urlYt, "_blank");
-        const msgRisposta = `Apro subito YouTube per cercare: ${ricerca}`;
+        const msgRisposta = `Certo! Apro YouTube per cercare: "${ricerca}"`;
         aggiungiMessaggio(msgRisposta, "ai-msg");
         if (voceAttiva.checked) parla(msgRisposta);
         return;
       }
 
-      if (testoLower.startsWith("cerca su google ") || testoLower.startsWith("cerca ")) {
-        const ricerca = testo.replace(/cerca su google|cerca/gi, "").trim();
+      // 2. Ricerca Google libera (es. "cerca su google...", "fammi vedere...", "informazioni su...")
+      if (testoLower.startsWith("cerca ") || testoLower.startsWith("cercami ") || testoLower.startsWith("informazioni su ")) {
+        const ricerca = testo.replace(/cerca su google|cerca|cercami|informazioni su/gi, "").trim();
         const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
         window.open(urlGoogle, "_blank");
-        const msgRisposta = `Ecco i risultati su Google per: ${ricerca}`;
+        const msgRisposta = `Ecco i risultati su Google per: "${ricerca}"`;
         aggiungiMessaggio(msgRisposta, "ai-msg");
         if (voceAttiva.checked) parla(msgRisposta);
         return;
       }
 
-      // 2. Rilevamento impegni
-      if (testoLower.includes("ricordami") || testoLower.includes("impegno") || testoLower.includes("appuntamento")) {
+      // 3. Gestione automatica di Ora, Data e Meteo a Torino (senza passare dal server)
+      if (testoLower.includes("ora") || testoLower.includes("che ore")) {
+        const oraCorrente = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        const msgRisposta = `Sono le ore ${oraCorrente}.`;
+        aggiungiMessaggio(msgRisposta, "ai-msg");
+        if (voceAttiva.checked) parla(msgRisposta);
+        storicoChat.push({ role: "user", content: testo });
+        storicoChat.push({ role: "assistant", content: msgRisposta });
+        return;
+      }
+
+      if (testoLower.includes("data") || testoLower.includes("giorno è") || testoLower.includes("che giorno")) {
+        const oggi = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const msgRisposta = `Oggi è ${oggi}.`;
+        aggiungiMessaggio(msgRisposta, "ai-msg");
+        if (voceAttiva.checked) parla(msgRisposta);
+        storicoChat.push({ role: "user", content: testo });
+        storicoChat.push({ role: "assistant", content: msgRisposta });
+        return;
+      }
+
+      if (testoLower.includes("meteo") || testoLower.includes("tempo fa") || testoLower.includes("previsioni")) {
+        // Apre direttamente il meteo di Torino in una scheda di comodo appoggio
+        const urlMeteo = `https://www.google.com/search?q=meteo+torino`;
+        window.open(urlMeteo, "_blank");
+        const msgRisposta = `Ti ho aperto le previsioni del meteo aggiornate per Torino in una nuova scheda!`;
+        aggiungiMessaggio(msgRisposta, "ai-msg");
+        if (voceAttiva.checked) parla(msgRisposta);
+        return;
+      }
+
+      // 4. Rilevamento impegni / promemoria flessibile
+      if (testoLower.includes("ricordami") || testoLower.includes("impegno") || testoLower.includes("appuntamento") || testoLower.includes("segnati")) {
         conteggioImpegni++;
         statImpegni.textContent = conteggioImpegni;
       }
 
-      // 3. Generazione immagini
-      if (testoLower.startsWith("genera immagine") || testoLower.startsWith("crea immagine")) {
-        const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine/gi, "").trim();
+      // 5. Generazione immagini flessibile (es. "disegnami", "crea un'immagine di", "fammi vedere un disegno di")
+      if (testoLower.startsWith("genera ") || testoLower.startsWith("crea ") || testoLower.startsWith("disegna ") || testoLower.startsWith("fammi un'immagine") || testoLower.startsWith("fammi vedere un'immagine")) {
+        const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine|disegna|fammi un'immagine di|fammi un'immagine|fammi vedere un'immagine di|fammi vedere un'immagine/gi, "").trim();
         aggiungiMessaggio(`Sto creando l'immagine per: "${promptImg}"...`, "ai-msg");
         
         const urlImmagine = `https://pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
@@ -321,7 +352,7 @@
         return;
       }
 
-      // 4. Risposta AI Cloud
+      // 6. Conversazione generale libera con l'intelligenza artificiale in cloud
       try {
         const res = await fetch(`${SERVER_URL}/chiedi`, {
           method: "POST",
@@ -343,6 +374,7 @@
         aggiungiMessaggio("Errore di connessione al server cloud.", "ai-msg");
       }
     }
+    
 
     function aggiungiMessaggio(testo, classe) {
       const div = document.createElement("div");
