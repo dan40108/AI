@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Siri & AI - Dashboard</title>
+  <title>Zoe & AI - Dashboard</title>
   <style>
     :root {
       --bg-main: #090d16;
@@ -25,7 +25,6 @@
       overflow: hidden;
     }
 
-    /* Sidebar delle chat */
     aside {
       width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color);
       display: flex; flex-direction: column; padding: 16px; gap: 16px;
@@ -44,12 +43,8 @@
     }
     .chat-item:hover, .chat-item.active { background: rgba(255,255,255,0.05); color: var(--text-main); }
 
-    /* Area principale */
-    main {
-      flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
-    }
+    main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-    /* Topbar con Titolo e Card Riepilogo */
     header {
       padding: 16px 24px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color);
       display: flex; flex-direction: column; gap: 12px;
@@ -65,7 +60,6 @@
     .card-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .card-value { font-size: 1rem; font-weight: 600; color: var(--accent); }
 
-    /* Contenitore della Chat a tutto schermo */
     #chat-container {
       flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;
     }
@@ -73,7 +67,6 @@
     .user-msg { background: var(--accent); align-self: flex-end; color: white; }
     .ai-msg { background: var(--bg-panel); border: 1px solid var(--border-color); align-self: flex-start; color: var(--text-main); }
 
-    /* Barra inferiore (Input, Sfera e Controlli) */
     .input-footer {
       padding: 16px 24px; background: var(--bg-sidebar); border-top: 1px solid var(--border-color);
       display: flex; align-items: center; gap: 16px;
@@ -84,8 +77,14 @@
       cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; flex-shrink: 0;
     }
     .orb:hover { transform: scale(1.08); }
-    .orb.listening { animation: pulse 1.2s infinite; background: linear-gradient(135deg, #f43f5e, #fb923c); }
+    /* Stato standby (in attesa della parola "Zoe") */
+    .orb.standby { box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); animation: breathe 3s infinite; }
+    /* Stato attivo (ha sentito "Zoe") */
+    .orb.listening { animation: pulse 1s infinite; background: linear-gradient(135deg, #f43f5e, #fb923c); }
+    /* Stato risposta vocale */
     .orb.speaking { animation: pulse 0.8s infinite; background: linear-gradient(135deg, #10b981, #38bdf8); }
+    
+    @keyframes breathe { 0%, 100% { opacity: 0.75; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1.04); } }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
     .input-wrapper {
@@ -100,13 +99,13 @@
     }
     .send-btn:hover { background: var(--accent-hover); }
 
-    .controls-panel { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+    .controls-panel { display: flex; align-items: center; gap: 15px; font-size: 0.85rem; color: var(--text-muted); }
+    #mic-status { font-size: 0.8rem; color: #38bdf8; }
     #model-badge { font-size: 0.75rem; color: var(--text-muted); padding: 0 24px 8px 24px; text-align: right; }
   </style>
 </head>
 <body>
 
-  <!-- Sidebar Gestione Chat -->
   <aside>
     <button class="new-chat-btn" onclick="nuovaChat()">+ Nuova Chat</button>
     <div class="chat-list" id="chat-list">
@@ -114,16 +113,16 @@
     </div>
   </aside>
 
-  <!-- Area Principale Dashboard -->
   <main>
     <header>
       <div class="header-top">
-        <h1>SIRI & AI</h1>
+        <h1>ZOE & AI</h1>
         <div class="controls-panel">
+          <span id="mic-status">Clicca la sfera o la pagina per attivare "Zoe"</span>
+          <label><input type="checkbox" id="ascolto-continuo" checked onchange="gestisciAscoltoContinuo()"> Ascolto "Zoe"</label>
           <label><input type="checkbox" id="voce-attiva" checked> Voce</label>
         </div>
       </div>
-      <!-- Card Riepilogo in alto -->
       <div class="summary-cards">
         <div class="card">
           <span class="card-title">Chat Attive</span>
@@ -140,18 +139,16 @@
       </div>
     </header>
 
-    <!-- Chat a tutto schermo -->
     <div id="chat-container">
-      <div class="msg ai-msg">Ciao Daniele! Dashboard attiva. Come posso aiutarti oggi?</div>
+      <div class="msg ai-msg">Ciao! Sono Zoe. Pronuncia il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b> o <b>"Zoe, che ore sono?"</b>) oppure scrivimi qui sotto.</div>
     </div>
 
     <div id="model-badge"></div>
 
-    <!-- Barra Footer con Sfera e Input -->
     <div class="input-footer">
-      <div class="orb" id="orb" onclick="avviaAscolto()" title="Parla con Siri"></div>
+      <div class="orb" id="orb" onclick="forzaAscoltoDiretto()" title="Clicca per parlare subito senza dire Zoe"></div>
       <div class="input-wrapper">
-        <input type="text" id="testo-input" placeholder="Scrivi un messaggio o 'genera immagine di...'" onkeydown="if(event.key==='Enter') inviaTesto()">
+        <input type="text" id="testo-input" placeholder="Scrivi un messaggio o pronuncia 'Zoe...' ad alta voce" onkeydown="if(event.key==='Enter') inviaTesto()">
         <button class="send-btn" onclick="inviaTesto()">Invia</button>
       </div>
     </div>
@@ -163,32 +160,110 @@
     let storicoChat = [];
     let conteggioImmagini = 0;
     let conteggioImpegni = 0;
+    let isSpeaking = false;
+    let ascoltoDiretto = false; // True se hai cliccato la sfera a mano
 
     const chatContainer = document.getElementById("chat-container");
     const orb = document.getElementById("orb");
     const badgeEl = document.getElementById("model-badge");
     const voceAttiva = document.getElementById("voce-attiva");
+    const ascoltoContinuoCheck = document.getElementById("ascolto-continuo");
+    const micStatus = document.getElementById("mic-status");
     const statImmagini = document.getElementById("stat-immagini");
     const statImpegni = document.getElementById("stat-impegni");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = "it-IT";
+    recognition.continuous = false;
     recognition.interimResults = false;
 
-    function avviaAscolto() {
-      window.speechSynthesis.cancel();
-      orb.className = "orb listening";
-      recognition.start();
+    function avviaMicrofono() {
+      if (isSpeaking) return;
+      try {
+        recognition.start();
+        if (ascoltoDiretto) {
+          orb.className = "orb listening";
+          micStatus.textContent = "Ti ascolto...";
+        } else {
+          orb.className = "orb standby";
+          micStatus.textContent = 'In attesa di "Zoe"...';
+        }
+      } catch (e) {
+        // Già avviato
+      }
     }
 
+    function forzaAscoltoDiretto() {
+      window.speechSynthesis.cancel();
+      isSpeaking = false;
+      ascoltoDiretto = true;
+      try { recognition.stop(); } catch(e) {}
+      setTimeout(avviaMicrofono, 150);
+    }
+
+    function gestisciAscoltoContinuo() {
+      if (ascoltoContinuoCheck.checked) {
+        avviaMicrofono();
+      } else {
+        try { recognition.stop(); } catch(e) {}
+        orb.className = "orb";
+        micStatus.textContent = "Microfono in pausa";
+      }
+    }
+
+    // Sblocca l'ascolto automatico al caricamento o al primo tocco sulla pagina
+    window.addEventListener("load", () => {
+      if (ascoltoContinuoCheck.checked) avviaMicrofono();
+    });
+    document.body.addEventListener("click", () => {
+      if (ascoltoContinuoCheck.checked && !isSpeaking) avviaMicrofono();
+    }, { once: true });
+
     recognition.onresult = (event) => {
-      const testoUtente = event.results[0][0].transcript;
-      orb.className = "orb";
-      processaMessaggio(testoUtente);
+      const trascritto = event.results[event.results.length - 1][0].transcript.trim();
+      const lower = trascritto.toLowerCase();
+
+      // Se hai cliccato la sfera a mano, accetta tutto subito
+      if (ascoltoDiretto) {
+        ascoltoDiretto = false;
+        orb.className = "orb";
+        processaMessaggio(trascritto);
+        return;
+      }
+
+      // Altrimenti cerca la parola chiave "Zoe" (o varianti fonetiche comuni come "Zoey" / "Zoi")
+      const matchZoe = lower.match(/\b(zoe|zoey|zoi)\b[,\s]*(.*)/i);
+      if (matchZoe) {
+        orb.className = "orb listening";
+        const comando = matchZoe[2].trim();
+        
+        if (comando.length > 0) {
+          // Hai detto "Zoe" seguito subito dalla domanda nella stessa frase
+          processaMessaggio(comando);
+        } else {
+          // Hai detto solo "Zoe": attiva l'ascolto diretto per la frase successiva
+          ascoltoDiretto = true;
+          micStatus.textContent = "Dimmi pure...";
+        }
+      }
     };
 
-    recognition.onerror = () => { orb.className = "orb"; };
+    // Riavvia automaticamente il microfono quando termina una pausa
+    recognition.onend = () => {
+      if (!isSpeaking && (ascoltoContinuoCheck.checked || ascoltoDiretto)) {
+        setTimeout(avviaMicrofono, 200);
+      } else if (!isSpeaking) {
+        orb.className = "orb";
+      }
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === "not-allowed") {
+        micStatus.textContent = "Permesso microfono negato";
+        ascoltoContinuoCheck.checked = false;
+      }
+    };
 
     function inviaTesto() {
       const input = document.getElementById("testo-input");
@@ -200,15 +275,36 @@
 
     async function processaMessaggio(testo) {
       aggiungiMessaggio(testo, "user-msg");
+      const testoLower = testo.toLowerCase();
 
-      // Rilevamento impegni/promemoria al volo
-      if (testo.toLowerCase().includes("ricordami") || testo.toLowerCase().includes("impegno") || testo.toLowerCase().includes("appuntamento")) {
+      // 1. Azioni Co-work (YouTube / Google)
+      if (testoLower.startsWith("metti ") || testoLower.includes("su youtube")) {
+        const ricerca = testo.replace(/metti|su youtube|apri youtube e metti|cerca su youtube/gi, "").trim();
+        const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
+        window.open(urlYt, "_blank");
+        const msgRisposta = `Apro subito YouTube per cercare: ${ricerca}`;
+        aggiungiMessaggio(msgRisposta, "ai-msg");
+        if (voceAttiva.checked) parla(msgRisposta);
+        return;
+      }
+
+      if (testoLower.startsWith("cerca su google ") || testoLower.startsWith("cerca ")) {
+        const ricerca = testo.replace(/cerca su google|cerca/gi, "").trim();
+        const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
+        window.open(urlGoogle, "_blank");
+        const msgRisposta = `Ecco i risultati su Google per: ${ricerca}`;
+        aggiungiMessaggio(msgRisposta, "ai-msg");
+        if (voceAttiva.checked) parla(msgRisposta);
+        return;
+      }
+
+      // 2. Rilevamento impegni
+      if (testoLower.includes("ricordami") || testoLower.includes("impegno") || testoLower.includes("appuntamento")) {
         conteggioImpegni++;
         statImpegni.textContent = conteggioImpegni;
       }
 
-      // Controllo generazione immagini
-      const testoLower = testo.toLowerCase();
+      // 3. Generazione immagini
       if (testoLower.startsWith("genera immagine") || testoLower.startsWith("crea immagine")) {
         const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine/gi, "").trim();
         aggiungiMessaggio(`Sto creando l'immagine per: "${promptImg}"...`, "ai-msg");
@@ -217,7 +313,6 @@
         const imgHtml = `<br><img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata">`;
         
         aggiungiMessaggio("Ecco l'immagine generata:" + imgHtml, "ai-msg");
-        
         conteggioImmagini++;
         statImmagini.textContent = conteggioImmagini;
 
@@ -226,6 +321,7 @@
         return;
       }
 
+      // 4. Risposta AI Cloud
       try {
         const res = await fetch(`${SERVER_URL}/chiedi`, {
           method: "POST",
@@ -257,7 +353,7 @@
     }
 
     function nuovaChat() {
-      chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Di cosa vogliamo parlare?</div>`;
+      chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
       storicoChat = [];
     }
 
@@ -267,13 +363,26 @@
       msg.lang = "it-IT";
       
       const voci = window.speechSynthesis.getVoices();
-      const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it')))
+      const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('isabella') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it')))
                           || voci.find(v => v.lang.startsWith('it'));
       if (voceFemminile) msg.voice = voceFemminile;
 
-      msg.onstart = () => { orb.className = "orb speaking"; };
-      msg.onend = () => { orb.className = "orb"; };
+      msg.onstart = () => {
+        isSpeaking = true;
+        try { recognition.stop(); } catch(e) {}
+        orb.className = "orb speaking";
+        micStatus.textContent = "Zoe sta parlando...";
+      };
+      msg.onend = () => {
+        isSpeaking = false;
+        orb.className = "orb";
+        if (ascoltoContinuoCheck.checked) avviaMicrofono();
+      };
       window.speechSynthesis.speak(msg);
+    }
+
+    if ('onvoiceschanged' in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
   </script>
 </body>
