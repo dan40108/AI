@@ -324,12 +324,12 @@
         statImpegni.textContent = conteggioImpegni;
       }
 
-      // 5. Generazione immagini flessibile con pulsante salvataggio
-      if (testoLower.startsWith("genera ") || testoLower.startsWith("crea ") || testoLower.startsWith("disegna ") || testoLower.startsWith("fammi un'immagine") || testoLower.startsWith("fammi vedere un'immagine")) {
-        const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine|disegna|fammi un'immagine di|fammi un'immagine|fammi vedere un'immagine di|fammi vedere un'immagine/gi, "").trim();
+     // 5. Generazione immagini flessibile (riconosce "immagine" o "disegna" ovunque nella frase)
+      if (testoLower.includes("immagine") || testoLower.includes("disegna") || testoLower.includes("disegnami")) {
+        const promptImg = testo.replace(/genera|crea|disegna|disegnami|fammi|mi|un'immagine|immagine|un disegno|di|per favore/gi, "").trim() || "paesaggio fantastico";
         aggiungiMessaggio(`Sto creando l'immagine per: "${promptImg}"...`, "ai-msg");
         
-        const urlImmagine = `https://pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
+        const urlImmagine = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
         const imgHtml = `
           <br>
           <img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
