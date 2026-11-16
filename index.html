@@ -159,16 +159,30 @@
       chatContainer.appendChild(div);
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-
-    function parla(testo) {
-      // Pulisce eventuali tag HTML prima di leggere la voce
+function parla(testo) {
       const testoPuro = testo.replace(/<[^>]*>?/gm, '');
       const msg = new SpeechSynthesisUtterance(testoPuro);
       msg.lang = "it-IT";
+      msg.rate = 1.0; // Velocità naturale
+
+      // Recupera le voci disponibili nel browser
+      const voci = window.speechSynthesis.getVoices();
+      
+      // Cerca prima una voce femminile specifica in italiano (es. Alice, Elsa, Federica o Google italiano)
+      const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it') || v.name.toLowerCase().includes('female')))
+                          || voci.find(v => v.lang.startsWith('it') && !v.name.toLowerCase().includes('cosimo') && !v.name.toLowerCase().includes('luca') && !v.name.toLowerCase().includes('male'));
+      
+      if (voceFemminile) {
+        msg.voice = voceFemminile;
+      }
+
       msg.onstart = () => { orb.className = "orb speaking"; };
       msg.onend = () => { orb.className = "orb"; };
       window.speechSynthesis.speak(msg);
     }
-  </script>
-</body>
-</html>
+
+    // Assicura il caricamento delle voci
+    if ('onvoiceschanged' in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+  
