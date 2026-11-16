@@ -36,7 +36,7 @@ def chiedi_ai(dati: Richiesta):
             messages=[
                 {
                     "role": "system",
-                    "content": "Sei un assistente vocale personale stile Jarvis. Rispondi in italiano, in modo naturale, amichevole e conciso (massimo 2-3 frasi, adatte per essere lette ad alta voce)."
+                    "content": "Ti chiami Zoe e sei un assistente vocale e testuale personale. Rispondi in italiano in modo conciso, naturale e amichevole."
                 },
                 {"role": "user", "content": dati.testo}
             ],
