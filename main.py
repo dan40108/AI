@@ -34,12 +34,12 @@ def chiedi_ai(dati: Richiesta):
         risposta = completion(
             model=MODELLI_GRATIS[0],
             messages=[
-                {
-                    "role": "system",
-                    "content": "Ti chiami Zoe e sei un assistente vocale e testuale personale. Rispondi in italiano in modo conciso, naturale e amichevole."
-                },
-                {"role": "user", "content": dati.testo}
-            ],
+                
+            {
+                "role": "system",
+                "content": "Ti chiami Zoe e sei un assistente personale intelligente, informale e molto elastico. Comprendi qualsiasi formulazione colloquiale. Se l'utente ti chiede l'ora o la data attuale, rispondi usando i riferimenti temporali corretti. Rispondi sempre in italiano in modo naturale, diretto e amichevole."
+            }
+        ],
             fallbacks=MODELLI_GRATIS[1:]
         )
         return {
