@@ -3,63 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assistente AI Cloud</title>
+  <title>Siri - AI Cloud</title>
   <style>
     body {
       margin: 0; height: 100vh; display: flex; flex-direction: column;
-      justify-content: center; align-items: center;
+      justify-content: space-between; align-items: center;
       background: radial-gradient(circle at center, #0f172a, #020617);
       color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;
       overflow: hidden;
     }
+    header { margin-top: 15px; font-size: 1.2rem; font-weight: 600; letter-spacing: 2px; color: #94a3b8; }
+    
+    #chat-container {
+      width: 90%; max-width: 600px; height: 40vh; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 10px; padding: 10px;
+      background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+    }
+    .msg { padding: 10px 14px; border-radius: 10px; max-width: 80%; font-size: 0.95rem; line-height: 1.4; }
+    .user-msg { background: #3b82f6; align-self: flex-end; color: white; }
+    .ai-msg { background: #1e293b; align-self: flex-start; color: #e2e8f0; }
+    
+    .center-panel { display: flex; flex-direction: column; align-items: center; gap: 15px; }
     .orb {
-      width: 140px; height: 140px; border-radius: 50%;
+      width: 100px; height: 100px; border-radius: 50%;
       background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
-      box-shadow: 0 0 40px rgba(56, 189, 248, 0.5);
-      cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.4);
+      cursor: pointer; transition: transform 0.3s ease;
       display: flex; justify-content: center; align-items: center;
     }
-    .orb:hover { transform: scale(1.06); }
-    .orb.listening {
-      animation: pulse 1.2s infinite;
-      background: linear-gradient(135deg, #f43f5e, #fb923c);
-      box-shadow: 0 0 60px rgba(244, 63, 94, 0.8);
+    .orb:hover { transform: scale(1.05); }
+    .orb.listening { animation: pulse 1.2s infinite; background: linear-gradient(135deg, #f43f5e, #fb923c); }
+    .orb.speaking { animation: pulse 0.8s infinite; background: linear-gradient(135deg, #10b981, #38bdf8); }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+    #input-bar {
+      width: 90%; max-width: 600px; display: flex; gap: 10px; margin-bottom: 20px;
     }
-    .orb.speaking {
-      animation: pulse 0.8s infinite;
-      background: linear-gradient(135deg, #10b981, #38bdf8);
-      box-shadow: 0 0 60px rgba(16, 185, 129, 0.8);
+    input[type="text"] {
+      flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155;
+      background: #090d16; color: white; font-size: 1rem; outline: none;
     }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.15); }
-      100% { transform: scale(1); }
+    button {
+      padding: 0 20px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-weight: 600; cursor: pointer;
     }
-    #status { margin-top: 28px; font-size: 1.1rem; color: #94a3b8; }
-    #transcript {
-      margin-top: 16px; max-width: 600px; text-align: center;
-      padding: 0 20px; font-size: 1.2rem; line-height: 1.5;
-    }
-    #model-badge {
-      position: fixed; bottom: 16px; font-size: 0.8rem; color: #475569;
-    }
+    button:hover { background: #2563eb; }
+    .controls { display: flex; gap: 15px; font-size: 0.9rem; color: #94a3b8; align-items: center; }
+    #generated-image { max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 5px; display: none; }
+    #model-badge { font-size: 0.75rem; color: #475569; margin-bottom: 5px; }
   </style>
 </head>
 <body>
 
-  <div class="orb" id="orb" onclick="avviaAscolto()"></div>
-  <div id="status">Clicca la sfera per parlare</div>
-  <div id="transcript"></div>
-  <div id="model-badge"></div>
+  <header>SIRI CLOUD</header>
+
+  <!-- Cronologia chat con memoria -->
+  <div id="chat-container">
+    <div class="msg ai-msg">Ciao! Sono pronto. Parlami o scrivimi qui sotto, ricordo tutto quello che ci dicianno e posso anche generare immagini.</div>
+  </div>
+
+  <div class="center-panel">
+    <div class="orb" id="orb" onclick="avviaAscolto()" title="Clicca per parlare"></div>
+    <div class="controls">
+      <label><input type="checkbox" id="voce-attiva" checked> Rispondi a voce</label>
+    </div>
+    <div id="model-badge"></div>
+  </div>
+
+  <!-- Barra per scrivere testualmente o chiedere immagini -->
+  <div id="input-bar">
+    <input type="text" id="testo-input" placeholder="Scrivi un messaggio o 'genera immagine di...'" onkeydown="if(event.key==='Enter') inviaTesto()">
+    <button onclick="inviaTesto()">Invia</button>
+  </div>
 
   <script>
-    // AL PASSO 3 INCOLLERAI QUI IL LINK DEL TUO SERVER RENDER
-    const SERVER_URL = "https://ai-ttmc.onrender.com";
+    const SERVER_URL = "https://ai-ttmc.onrender.com"; // Il tuo URL Render
 
+    let storicoChat = []; // Memoria della conversazione
+    const chatContainer = document.getElementById("chat-container");
     const orb = document.getElementById("orb");
-    const statusEl = document.getElementById("status");
-    const transcriptEl = document.getElementById("transcript");
     const badgeEl = document.getElementById("model-badge");
+    const voceAttiva = document.getElementById("voce-attiva");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -69,49 +92,81 @@
     function avviaAscolto() {
       window.speechSynthesis.cancel();
       orb.className = "orb listening";
-      statusEl.textContent = "Ti ascolto...";
       recognition.start();
     }
 
-    recognition.onresult = async (event) => {
+    recognition.onresult = (event) => {
       const testoUtente = event.results[0][0].transcript;
-      transcriptEl.textContent = `Tu: "${testoUtente}"`;
       orb.className = "orb";
-      statusEl.textContent = "Sto pensando...";
+      processaMessaggio(testoUtente);
+    };
+
+    recognition.onerror = () => { orb.className = "orb"; };
+
+    function inviaTesto() {
+      const input = document.getElementById("testo-input");
+      const testo = input.value.trim();
+      if (!testo) return;
+      input.value = "";
+      processaMessaggio(testo);
+    }
+
+    async function processaMessaggio(testo) {
+      aggiungiMessaggio(testo, "user-msg");
+
+      // Controllo se l'utente vuole generare un'immagine
+      if (testo.toLowerCase().startsWith("genera immagine") || testo.toLowerCase().startsWith("crea immagine")) {
+        const promptImg = testo.replace(/genera immagine di|genera immagine|crea immagine di|crea immagine/gi, "").trim();
+        aggiungiMessaggio(`Sto creando l'immagine per: "${promptImg}"...`, "ai-msg");
+        
+        const urlImmagine = `https://pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
+        
+        const imgHtml = `<br><img src="${urlImmagine}" id="generated-image" style="display:block;" alt="Immagine generata">`;
+        aggiungiMessaggio("Ecco l'immagine generata:" + imgHtml, "ai-msg");
+        
+        storicoChat.push({ role: "user", content: testo });
+        storicoChat.push({ role: "assistant", content: `Ho generato l'immagine richiesta: ${promptImg}` });
+        return;
+      }
 
       try {
         const res = await fetch(`${SERVER_URL}/chiedi`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ testo: testoUtente })
+          body: JSON.stringify({ testo: testo, storico: storicoChat })
         });
         const dati = await res.json();
-        transcriptEl.textContent = dati.risposta;
-        if (dati.modello) badgeEl.textContent = `Modello attivo: ${dati.modello}`;
-        parla(dati.risposta);
-      } catch (err) {
-        statusEl.textContent = "Errore di connessione al server cloud";
-        console.error(err);
-      }
-    };
+        
+        aggiungiMessaggio(dati.risposta, "ai-msg");
+        if (dati.modello) badgeEl.textContent = `Modello: ${dati.modello}`;
 
-    recognition.onerror = () => {
-      orb.className = "orb";
-      statusEl.textContent = "Non ho sentito, clicca per riprovare";
-    };
+        // Aggiorna la memoria (storico)
+        storicoChat.push({ role: "user", content: testo });
+        storicoChat.push({ role: "assistant", content: dati.risposta });
+
+        if (voceAttiva.checked) {
+          parla(dati.risposta);
+        }
+      } catch (err) {
+        aggiungiMessaggio("Errore di connessione al server cloud.", "ai-msg");
+      }
+    }
+
+    function aggiungiMessaggio(testo, classe) {
+      const div = document.createElement("div");
+      div.className = `msg ${classe}`;
+      div.innerHTML = testo;
+      chatContainer.appendChild(div);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 
     function parla(testo) {
-      const msg = new SpeechSynthesisUtterance(testo);
+      // Pulisce eventuali tag HTML prima di leggere la voce
+      const testoPuro = testo.replace(/<[^>]*>?/gm, '');
+      const msg = new SpeechSynthesisUtterance(testoPuro);
       msg.lang = "it-IT";
-      msg.rate = 1.05;
-      msg.onstart = () => {
-        orb.className = "orb speaking";
-        statusEl.textContent = "Sto rispondendo...";
-      };
-      msg.onend = () => {
-        orb.className = "orb";
-        statusEl.textContent = "Clicca la sfera per parlare";
-      };
+      msg.onstart = () => { orb.className = "orb speaking"; };
+      msg.onend = () => { orb.className = "orb"; };
       window.speechSynthesis.speak(msg);
     }
   </script>
