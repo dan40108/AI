@@ -26,19 +26,17 @@ async def home():
 async def chiedi(req: Richiesta):
     testo_lower = req.testo.lower()
     
-    # Riconosce se vuoi che Zoe si auto-migliori o scriva codice
     is_meta_coder = any(k in testo_lower for k in [
         "migliorati", "auto-migliora", "codice", "script", "funzione", 
         "programma", "patch", "aggiorna", "analizza il tuo codice", "ottimizza"
     ])
     
-   if is_meta_coder:
+    if is_meta_coder:
         system_prompt = (
             "Sei l'Agente Meta-Programmatore di Zoe. Il tuo obiettivo è analizzare il codice, "
             "progettare miglioramenti strutturali, scrivere codice pulito, commentato e privo di errori "
             "in Python, FastAPI o JavaScript. Non usare mai emoji o asterischi. Rispondi in modo tecnico."
         )
-        # Usiamo Llama 3.3 70B come primo agente: è velocissimo, potentissimo nel coding e non va in timeout
         modelli = [
             "groq/llama-3.3-70b-versatile",
             "gemini/gemini-2.0-flash",
