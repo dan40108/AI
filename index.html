@@ -140,7 +140,7 @@
         <h1>ZOE & AI</h1>
         <div class="controls-panel">
           <span id="mic-status">Clicca la sfera o la pagina per attivare "Zoe"</span>
-          <label><input type="checkbox" id="ascolto-continuo" checked onchange="gestisciAscoltoContinuo()"> Ascolto "Zoe"</label>
+          <label><input type="checkbox" id="ascolto-continu"> Ascolto "Zoe"</label>
           <label><input type="checkbox" id="voce-attiva" checked> Voce</label>
           <span class="auto-update-badge">Auto-Update Attivo</span>
         </div>
@@ -168,7 +168,7 @@
     <div id="model-badge"></div>
 
     <div class="input-footer">
-      <div class="orb" id="orb" onclick="forzaAscoltoDiretto()" title="Clicca per parlare subito senza dire Zoe"></div>
+      <div class="orb" id="orb" onclick="toggleMicrofono()" title="Clicca per parlare subito senza dire Zoe"></div>
       <div class="input-wrapper">
         <input type="text" id="testo-input" placeholder="Scrivi un messaggio o pronuncia 'Zoe...' ad alta voce" onkeydown="if(event.key==='Enter') inviaTesto()">
         <button class="send-btn" onclick="inviaTesto()">Invia</button>
@@ -184,12 +184,14 @@
     let conteggioImpegni = 0;
     let isSpeaking = false;
     let ascoltoDiretto = false;
+    let isListening = false;
+    let isManualStop = false;
 
     const chatContainer = document.getElementById("chat-container");
     const orb = document.getElementById("orb");
     const badgeEl = document.getElementById("model-badge");
     const voceAttiva = document.getElementById("voce-attiva");
-    const ascoltoContinuoCheck = document.getElementById("ascolto-continuo");
+    const ascoltoContinuuoCheck = document.getElementById("ascolto-continu");
     const micStatus = document.getElementById("mic-status");
     const statImmagini = document.getElementById("stat-immagini");
     const statImpegni = document.getElementById("stat-impegni");
@@ -203,9 +205,19 @@
     }
 
     function avviaMicrofono() {
-      if (!recognition || isSpeaking) return;
+      if (!recognition) return;
+      if (isSpeaking) {
+        isSpeaking = false;
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        orb.className = "orb";
+        micStatus.textContent = "Microfono in pausa";
+        return;
+      }
+      isManualStop = false;
+      if (isListening) return;
       try {
         recognition.start();
+        isListening = true;
         if (ascoltoDiretto) {
           orb.className = "orb listening";
           micStatus.textContent = "Ti ascolto...";
@@ -213,7 +225,26 @@
           orb.className = "orb standby";
           micStatus.textContent = 'In attesa di "Zoe"...';
         }
-      } catch (e) {}
+      } catch (e) {
+        isListening = false;
+      }
+    }
+
+    function fermaMicrofono() {
+      isListening = false;
+      isManualStop = true;
+      try { if (recognition) recognition.stop(); } catch(e) {}
+      orb.className = "orb";
+      micStatus.textContent = "Microfono in pausa";
+    }
+
+    function toggleMicrofono() {
+      if (isListening) {
+        fermaMicrofono();
+        return;
+      }
+      ascoltoDiretto = true;
+      avviaMicrofono();
     }
 
     function forzaAscoltoDiretto() {
@@ -224,23 +255,23 @@
       setTimeout(avviaMicrofono, 150);
     }
 
-    function gestisciAscoltoContinuo() {
+    function gestisciAscoltoContinu() {
       if (!recognition) return;
-      if (ascoltoContinuoCheck.checked) {
+      if (ascoltoContinuuoCheck.checked) {
         avviaMicrofono();
       } else {
-        try { recognition.stop(); } catch(e) {}
-        orb.className = "orb";
-        micStatus.textContent = "Microfono in pausa";
+        fermaMicrofono();
       }
     }
 
     window.addEventListener("load", () => {
-      if (ascoltoContinuoCheck.checked) avviaMicrofono();
+      if (ascoltoContinuuoCheck.checked) avviaMicrofono();
     });
-    document.body.addEventListener("click", () => {
-      if (ascoltoContinuoCheck.checked && !isSpeaking) avviaMicrofono();
-    }, { once: true });
+    document.body.addEventListener("click", (e) => {
+      if (ascoltoContinuuoCheck.checked && !isListening && !isSpeaking && !e.target.closest("#orb")) {
+        avviaMicrofono();
+      }
+    });
 
     if (recognition) {
       recognition.onresult = (event) => {
@@ -249,6 +280,7 @@
 
         if (ascoltoDiretto) {
           ascoltoDiretto = false;
+          isListening = false;
           orb.className = "orb";
           processaMessaggio(trascritto);
           return;
@@ -269,17 +301,32 @@
       };
 
       recognition.onend = () => {
-        if (!isSpeaking && (ascoltoContinuoCheck.checked || ascoltoDiretto)) {
+        isListening = false;
+        if (isManualStop) {
+          isManualStop = false;
+          orb.className = "orb";
+          micStatus.textContent = "Microfono in pausa";
+          return;
+        }
+        if (!isSpeaking && (ascoltoContinuuoCheck.checked || ascoltoDiretto)) {
           setTimeout(avviaMicrofono, 200);
         } else if (!isSpeaking) {
           orb.className = "orb";
+          micStatus.textContent = "Microfono in pausa";
         }
       };
 
       recognition.onerror = (event) => {
         if (event.error === "not-allowed") {
           micStatus.textContent = "Permesso microfono negato";
-          ascoltoContinuoCheck.checked = false;
+          ascoltoContinuuoCheck.checked = false;
+        }
+        if (!isSpeaking) {
+          isListening = false;
+          isManualStop = true;
+          try { if (recognition) recognition.stop(); } catch(e) {}
+          orb.className = "orb";
+          micStatus.textContent = "Microfono in pausa";
         }
       };
     }
@@ -301,29 +348,26 @@
       aggiungiMessaggio(testo, "user-msg");
       const testoLower = testo.toLowerCase();
 
-      // 1. Apertura YouTube libera
-      if (testoLower.includes("youtube") || testoLower.includes("metti ") || testoLower.includes("ascoltare ") || testoLower.includes("suona ")) {
+      if (testoLower.includes("youtube") || testoLower.includes("metti ") || testoLower.includes("ascolta ") || testoLower.includes("suona ")) {
         const ricerca = testo.replace(/mi cerchi|cercami|cerca|su youtube|youtube|apri|metti|fammi ascoltare|suona|per favore/gi, "").trim();
         const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
         apriSchedaSicura(urlYt);
-        const msgHtml = `Certo! Cerco su YouTube: <b>"${ricerca}"</b><br><a href="${urlYt}" target="_blank" class="link-btn">▶ Apri su YouTube</a>`;
+        const msgHtml = `Certo! Cerco su YouTube: <b>"${ricerca}"</b><br><a href="${urlYt}" target="_blank" class="link-btn">Apri su YouTube</a>`;
         aggiungiMessaggio(msgHtml, "ai-msg");
         if (voceAttiva.checked) parla(`Certo! Cerco su YouTube ${ricerca}`);
         return;
       }
 
-      // 2. Ricerca Google libera
       if (testoLower.startsWith("cerca ") || testoLower.startsWith("cercami ") || testoLower.startsWith("mi cerchi ") || testoLower.startsWith("informazioni su ")) {
         const ricerca = testo.replace(/cerca su google|mi cerchi|cercami|cerca|informazioni su/gi, "").trim();
         const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
         apriSchedaSicura(urlGoogle);
-        const msgHtml = `Ecco i risultati su Google per: <b>"${ricerca}"</b><br><a href="${urlGoogle}" target="_blank" class="link-btn">🔍 Apri risultati Google</a>`;
+        const msgHtml = `Ecco i risultati su Google per: <b>"${ricerca}"</b><br><a href="${urlGoogle}" target="_blank" class="link-btn">Apri risultati Google</a>`;
         aggiungiMessaggio(msgHtml, "ai-msg");
         if (voceAttiva.checked) parla(`Ecco i risultati su Google per ${ricerca}`);
         return;
       }
 
-      // 3. Ora, Data e Meteo Torino
       if (testoLower.includes("che ore") || testoLower === "ora") {
         const oraCorrente = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
         const msgRisposta = `Sono le ore ${oraCorrente}.`;
@@ -347,26 +391,24 @@
       if (testoLower.includes("meteo") || testoLower.includes("tempo fa") || testoLower.includes("previsioni")) {
         const urlMeteo = `https://www.google.com/search?q=meteo+torino`;
         apriSchedaSicura(urlMeteo);
-        const msgHtml = `Ecco il meteo aggiornato per Torino:<br><a href="${urlMeteo}" target="_blank" class="link-btn">☀️ Apri Meteo Torino</a>`;
+        const msgHtml = `Ecco i risultati sul meteo aggiornati per Torino:<br><a href="${urlMeteo}" target="_blank" class="link-btn">Apri Meteo Torino</a>`;
         aggiungiMessaggio(msgHtml, "ai-msg");
         if (voceAttiva.checked) parla("Ti ho aperto le previsioni del meteo per Torino.");
         return;
       }
 
-      // 4. Rilevamento impegni
       if (testoLower.includes("ricordami") || testoLower.includes("impegno") || testoLower.includes("appuntamento") || testoLower.includes("segnati")) {
         conteggioImpegni++;
         statImpegni.textContent = conteggioImpegni;
       }
 
-      // 5. Generazione immagini flessibile
       if (testoLower.includes("immagine") || testoLower.includes("disegna") || testoLower.includes("disegnami")) {
         const promptImg = testo.replace(/genera|crea|disegna|disegnami|fammi|mi|un'immagine|immagine|un disegno|di|per favore/gi, "").trim() || "paesaggio fantastico";
         const urlImmagine = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
         const imgHtml = `
           Ecco l'immagine generata per <b>"${promptImg}"</b>:<br>
           <img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
-          <a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" class="link-btn">📥 Salva Immagine sul PC</a>
+          <a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" class="link-btn">Salva Immagine sul PC</a>
         `;
 
         aggiungiMessaggio(imgHtml, "ai-msg");
@@ -378,7 +420,6 @@
         return;
       }
 
-      // 6. Conversazione generale AI Cloud con ROTELLA DI CARICAMENTO
       const loadingDiv = document.createElement("div");
       loadingDiv.className = "msg ai-msg loading-box";
       loadingDiv.innerHTML = `<div class="spinner"></div><span>Zoe sta elaborando la risposta...</span>`;
@@ -440,6 +481,7 @@
 
       msg.onstart = () => {
         isSpeaking = true;
+        isListening = false;
         try { if (recognition) recognition.stop(); } catch(e) {}
         orb.className = "orb speaking";
         micStatus.textContent = "Zoe sta parlando...";
@@ -447,7 +489,7 @@
       msg.onend = () => {
         isSpeaking = false;
         orb.className = "orb";
-        if (ascoltoContinuoCheck.checked) avviaMicrofono();
+        if (ascoltoContinuuoCheck.checked) avviaMicrofono();
       };
       window.speechSynthesis.speak(msg);
     }
