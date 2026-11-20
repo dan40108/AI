@@ -35,7 +35,7 @@
       align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;
     }
     .new-chat-btn:hover { background: var(--accent-hover); }
-    
+
     .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
     .chat-item {
       padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
@@ -51,7 +51,7 @@
     }
     .header-top { display: flex; justify-content: space-between; align-items: center; }
     h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 1px; color: var(--text-main); }
-    
+
     .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .card {
       background: var(--bg-panel); border: 1px solid var(--border-color); padding: 10px 14px;
@@ -67,7 +67,6 @@
     .user-msg { background: var(--accent); align-self: flex-end; color: white; }
     .ai-msg { background: var(--bg-panel); border: 1px solid var(--border-color); align-self: flex-start; color: var(--text-main); }
 
-    /* Rotella di caricamento animata */
     .loading-box { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-style: italic; }
     .spinner {
       width: 18px; height: 18px; border: 3px solid rgba(59, 130, 246, 0.25);
@@ -96,7 +95,7 @@
     .orb.standby { box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); animation: breathe 3s infinite; }
     .orb.listening { animation: pulse 1s infinite; background: linear-gradient(135deg, #f43f5e, #fb923c); }
     .orb.speaking { animation: pulse 0.8s infinite; background: linear-gradient(135deg, #10b981, #38bdf8); }
-    
+
     @keyframes breathe { 0%, 100% { opacity: 0.75; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1.04); } }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
@@ -186,13 +185,15 @@
     const statImpegni = document.getElementById("stat-impegni");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "it-IT";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+    if (recognition) {
+      recognition.lang = "it-IT";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+    }
 
     function avviaMicrofono() {
-      if (isSpeaking) return;
+      if (!recognition || isSpeaking) return;
       try {
         recognition.start();
         if (ascoltoDiretto) {
@@ -209,11 +210,12 @@
       window.speechSynthesis.cancel();
       isSpeaking = false;
       ascoltoDiretto = true;
-      try { recognition.stop(); } catch(e) {}
+      try { if (recognition) recognition.stop(); } catch(e) {}
       setTimeout(avviaMicrofono, 150);
     }
 
     function gestisciAscoltoContinuo() {
+      if (!recognition) return;
       if (ascoltoContinuoCheck.checked) {
         avviaMicrofono();
       } else {
@@ -230,45 +232,47 @@
       if (ascoltoContinuoCheck.checked && !isSpeaking) avviaMicrofono();
     }, { once: true });
 
-    recognition.onresult = (event) => {
-      const trascritto = event.results[event.results.length - 1][0].transcript.trim();
-      const lower = trascritto.toLowerCase();
+    if (recognition) {
+      recognition.onresult = (event) => {
+        const trascritto = event.results[event.results.length - 1][0].transcript.trim();
+        const lower = trascritto.toLowerCase();
 
-      if (ascoltoDiretto) {
-        ascoltoDiretto = false;
-        orb.className = "orb";
-        processaMessaggio(trascritto);
-        return;
-      }
-
-      const matchZoe = lower.match(/\b(zoe|zoey|zoi)\b[,\s]*(.*)/i);
-      if (matchZoe) {
-        orb.className = "orb listening";
-        const comando = matchZoe[2].trim();
-        
-        if (comando.length > 0) {
-          processaMessaggio(comando);
-        } else {
-          ascoltoDiretto = true;
-          micStatus.textContent = "Dimmi pure...";
+        if (ascoltoDiretto) {
+          ascoltoDiretto = false;
+          orb.className = "orb";
+          processaMessaggio(trascritto);
+          return;
         }
-      }
-    };
 
-    recognition.onend = () => {
-      if (!isSpeaking && (ascoltoContinuoCheck.checked || ascoltoDiretto)) {
-        setTimeout(avviaMicrofono, 200);
-      } else if (!isSpeaking) {
-        orb.className = "orb";
-      }
-    };
+        const matchZoe = lower.match(/\b(zoe|zoey|zoi)\b[,\s]*(.*)/i);
+        if (matchZoe) {
+          orb.className = "orb listening";
+          const comando = matchZoe[2].trim();
 
-    recognition.onerror = (event) => {
-      if (event.error === "not-allowed") {
-        micStatus.textContent = "Permesso microfono negato";
-        ascoltoContinuoCheck.checked = false;
-      }
-    };
+          if (comando.length > 0) {
+            processaMessaggio(comando);
+          } else {
+            ascoltoDiretto = true;
+            micStatus.textContent = "Dimmi pure...";
+          }
+        }
+      };
+
+      recognition.onend = () => {
+        if (!isSpeaking && (ascoltoContinuoCheck.checked || ascoltoDiretto)) {
+          setTimeout(avviaMicrofono, 200);
+        } else if (!isSpeaking) {
+          orb.className = "orb";
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === "not-allowed") {
+          micStatus.textContent = "Permesso microfono negato";
+          ascoltoContinuoCheck.checked = false;
+        }
+      };
+    }
 
     function inviaTesto() {
       const input = document.getElementById("testo-input");
@@ -310,7 +314,7 @@
       }
 
       // 3. Ora, Data e Meteo Torino
-      if (testoLower.includes("ora") || testoLower.includes("che ore")) {
+      if (testoLower.includes("che ore") || testoLower === "ora") {
         const oraCorrente = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
         const msgRisposta = `Sono le ore ${oraCorrente}.`;
         aggiungiMessaggio(msgRisposta, "ai-msg");
@@ -354,7 +358,7 @@
           <img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
           <a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" class="link-btn">📥 Salva Immagine sul PC</a>
         `;
-        
+
         aggiungiMessaggio(imgHtml, "ai-msg");
         conteggioImmagini++;
         statImmagini.textContent = conteggioImmagini;
@@ -377,23 +381,27 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ testo: testo, storico: storicoChat })
         });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
         const dati = await res.json();
-        
-        // Rimuove la rotella di caricamento prima di mostrare la risposta
         loadingDiv.remove();
 
-        aggiungiMessaggio(dati.risposta, "ai-msg");
+        const rispostaTesto = dati.risposta || "Nessuna risposta ricevuta dal server.";
+        aggiungiMessaggio(rispostaTesto, "ai-msg");
         if (dati.modello) badgeEl.textContent = `Modello: ${dati.modello}`;
 
         storicoChat.push({ role: "user", content: testo });
-        storicoChat.push({ role: "assistant", content: dati.risposta });
+        storicoChat.push({ role: "assistant", content: rispostaTesto });
 
         if (voceAttiva.checked) {
-          parla(dati.risposta);
+          parla(rispostaTesto);
         }
       } catch (err) {
         loadingDiv.remove();
-        aggiungiMessaggio("Errore di connessione al server cloud.", "ai-msg");
+        aggiungiMessaggio(`Errore di connessione al server cloud (${err.message}).`, "ai-msg");
       }
     }
 
@@ -414,7 +422,7 @@
       const testoPuro = testo.replace(/<[^>]*>?/gm, '');
       const msg = new SpeechSynthesisUtterance(testoPuro);
       msg.lang = "it-IT";
-      
+
       const voci = window.speechSynthesis.getVoices();
       const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('isabella') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it')))
                           || voci.find(v => v.lang.startsWith('it'));
@@ -422,7 +430,7 @@
 
       msg.onstart = () => {
         isSpeaking = true;
-        try { recognition.stop(); } catch(e) {}
+        try { if (recognition) recognition.stop(); } catch(e) {}
         orb.className = "orb speaking";
         micStatus.textContent = "Zoe sta parlando...";
       };
