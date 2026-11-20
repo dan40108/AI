@@ -158,7 +158,7 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
         res = await esegui_modello(
             modelli_coder,
             [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-            timeout_sec=60.0,
+            timeout_sec=300.0,
         )
         nuovo_codice = _pulisci_blocco_codice(res["risposta"])
         if not nuovo_codice or len(nuovo_codice) < 40:
