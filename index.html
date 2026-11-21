@@ -12,6 +12,8 @@
       --border-color: #1e293b;
       --accent: #3b82f6;
       --accent-hover: #2563eb;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
     }
@@ -112,9 +114,10 @@
     .send-btn:hover { background: var(--accent-hover); }
 
     .stop-btn {
-      background: #ef4444; border: none; padding: 0 20px; color: white; font-weight: 600; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+      background: var(--danger); border: none; padding: 12px 20px; color: white; font-weight: 600; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+      border-radius: 8px;
     }
-    .stop-btn:hover { background: #dc2626; }
+    .stop-btn:hover { background: var(--danger-hover); }
     .stop-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .controls-panel { display: flex; align-items: center; gap: 15px; font-size: 0.85rem; color: var(--text-muted); }
