@@ -18,7 +18,7 @@
 --text-muted: #94a3b8;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 body {
 height: 100vh; height: 100dvh; display: flex;
@@ -74,11 +74,10 @@ border-radius: 10px; display: flex; flex-direction: column; gap: 4px; min-width:
 flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px;
 -webkit-overflow-scrolling: touch;
 }
-    .msg { padding: 12px 16px; border-radius: 14px; max-width: 85%; font-size: 0.95rem; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; }
-    .msg {
-      padding: 12px 16px; border-radius: 14px; max-width: 85%; font-size: 0.95rem; line-height: 1.55;
-      white-space: pre-wrap; word-wrap: break-word; contain: content;
-    }
+.msg {
+padding: 12px 16px; border-radius: 14px; max-width: 85%; font-size: 0.95rem; line-height: 1.55;
+white-space: pre-wrap; word-wrap: break-word; contain: content;
+}
 .user-msg { background: var(--accent); align-self: flex-end; color: white; border-bottom-right-radius: 4px; }
 .ai-msg { background: var(--bg-panel); border: 1px solid var(--border-color); align-self: flex-start; color: var(--text-main); border-bottom-left-radius: 4px; }
 .ai-msg img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 8px; display: block; }
@@ -106,8 +105,7 @@ display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap;
 width: 48px; height: 48px; border-radius: 50%;
 background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
 cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; flex-shrink: 0;
-      min-width: 48px;
-      min-width: 48px; will-change: transform, background;
+min-width: 48px; will-change: transform, background;
 }
 .orb:hover { transform: scale(1.08); }
 .orb:active { transform: scale(0.95); }
@@ -154,7 +152,6 @@ white-space: nowrap;
 label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 
-/* Mobile Styles */
 @media (max-width: 768px) {
 .sidebar-toggle {
 display: flex; align-items: center; justify-content: center;
@@ -216,7 +213,6 @@ input[type="text"] { padding: 8px 12px; font-size: 0.95rem; }
 .controls-panel { gap: 8px; }
 }
 
-/* Landscape mobile adjustments */
 @media (max-height: 500px) and (orientation: landscape) {
 header { padding: 10px 14px; gap: 8px; }
 .summary-cards { gap: 6px; }
@@ -273,7 +269,7 @@ header { padding: 10px 14px; gap: 8px; }
 <div class="orb" id="orb" onclick="toggleMicrofono()" title="Clicca per parlare subito senza dire Zoe"></div>
 <div class="input-wrapper">
 <input type="text" id="testo-input" placeholder="Scrivi un messaggio o pronuncia 'Zoe...' ad alta voce" onkeydown="if(event.key==='Enter') inviaTesto()">
-<button class="send-btn" onclick="inviaTesto()">Invia</button>
+<button class="send-btn" id="send-btn" onclick="inviaTesto()">Invia</button>
 </div>
 <button class="stop-btn" id="stop-btn" onclick="stopAll()" disabled title="Stop">Stop</button>
 </div>
@@ -291,8 +287,8 @@ let isListening = false;
 let isManualStop = false;
 let isStopped = false;
 let abortController = null;
-    let rAFScroll = null;
-    let vociCache = [];
+let rAFScroll = null;
+let vociCache = [];
 
 const chatContainer = document.getElementById("chat-container");
 const orb = document.getElementById("orb");
@@ -303,6 +299,8 @@ const micStatus = document.getElementById("mic-status");
 const statImmagini = document.getElementById("stat-immagini");
 const statImpegni = document.getElementById("stat-impegni");
 const stopBtn = document.getElementById("stop-btn");
+const sendBtn = document.getElementById("send-btn");
+const testoInput = document.getElementById("testo-input");
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
 
@@ -314,65 +312,68 @@ recognition.continuous = false;
 recognition.interimResults = false;
 }
 
-    if (typeof window.speechSynthesis !== "undefined") {
-      const loadVoices = () => { vociCache = window.speechSynthesis.getVoices(); };
-      loadVoices();
-      if (window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = loadVoices;
-      }
-    }
+if (typeof window.speechSynthesis !== "undefined") {
+const loadVoices = () => { vociCache = window.speechSynthesis.getVoices(); };
+loadVoices();
+if (window.speechSynthesis.onvoiceschanged !== undefined) {
+window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+}
+
+function setControlsDisabled(disabled) {
+testoInput.disabled = disabled;
+sendBtn.disabled = disabled;
+stopBtn.disabled = !disabled;
+}
 
 function toggleSidebar() {
 sidebar.classList.toggle("open");
 sidebarToggle.textContent = sidebar.classList.contains("open") ? "✕" : "☰";
 }
 
-    function scrollToBottom() {
-      if (rAFScroll) cancelAnimationFrame(rAFScroll);
-      rAFScroll = requestAnimationFrame(() => {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        rAFScroll = null;
-      });
-    }
+function scrollToBottom() {
+if (rAFScroll) cancelAnimationFrame(rAFScroll);
+rAFScroll = requestAnimationFrame(() => {
+chatContainer.scrollTop = chatContainer.scrollHeight;
+rAFScroll = null;
+});
+}
 
 function stopAll() {
 isStopped = true;
-window.speechSynthesis.cancel();
+if (typeof window.speechSynthesis !== "undefined") {
+try { window.speechSynthesis.cancel(); } catch (e) {}
+}
 isSpeaking = false;
 isListening = false;
 if (recognition) {
-try { recognition.abort(); } catch(e) {
-try { recognition.stop(); } catch(e2) {}
+try { recognition.abort(); } catch (e) {
+try { recognition.stop(); } catch (e2) {}
 }
 }
 if (abortController) {
-try { abortController.abort(); } catch(e) {}
+try { abortController.abort(); } catch (e) {}
+abortController = null;
 }
 document.querySelectorAll(".loading-box").forEach(el => el.remove());
 orb.className = "orb";
 micStatus.textContent = "Interrotto";
-      document.getElementById("testo-input").disabled = false;
-      const input = document.getElementById("testo-input");
-      input.disabled = false;
-document.querySelector(".send-btn").disabled = false;
-stopBtn.disabled = true;
-      setTimeout(() => { isStopped = false; }, 100);
-      setTimeout(() => { isStopped = false; }, 50);
+setControlsDisabled(false);
+setTimeout(() => { isStopped = false; }, 100);
 }
 
 function avviaMicrofono() {
-if (!recognition) return;
-      if (isListening) return;
+if (!recognition || isListening) return;
 if (isSpeaking) {
 isSpeaking = false;
-        try { window.speechSynthesis.cancel(); } catch(e) {}
-        window.speechSynthesis.cancel();
+if (typeof window.speechSynthesis !== "undefined") {
+try { window.speechSynthesis.cancel(); } catch (e) {}
+}
 orb.className = "orb";
-        micStatus.textContent = "Microfono in pausa";
-        return;
+micStatus.textContent = "Microfono in pausa";
+return;
 }
 isManualStop = false;
-      if (isListening) return;
 try {
 recognition.start();
 isListening = true;
@@ -391,7 +392,7 @@ isListening = false;
 function fermaMicrofono() {
 isListening = false;
 isManualStop = true;
-try { if (recognition) recognition.stop(); } catch(e) {}
+try { if (recognition) recognition.stop(); } catch (e) {}
 orb.className = "orb";
 micStatus.textContent = "Microfono in pausa";
 }
@@ -401,22 +402,15 @@ if (isListening) {
 fermaMicrofono();
 return;
 }
-      if (isSpeaking) {
-        window.speechSynthesis.cancel();
-        isSpeaking = false;
-        orb.className = "orb";
-      }
+if (isSpeaking) {
+if (typeof window.speechSynthesis !== "undefined") {
+try { window.speechSynthesis.cancel(); } catch (e) {}
+}
+isSpeaking = false;
+orb.className = "orb";
+}
 ascoltoDiretto = true;
 avviaMicrofono();
-}
-
-function forzaAscoltoDiretto() {
-window.speechSynthesis.cancel();
-isSpeaking = false;
-ascoltoDiretto = true;
-try { if (recognition) recognition.stop(); } catch(e) {}
-      setTimeout(avviaMicrofono, 150);
-      avviaMicrofono();
 }
 
 function gestisciAscoltoContinu() {
@@ -472,12 +466,9 @@ orb.className = "orb";
 micStatus.textContent = "Microfono in pausa";
 return;
 }
-        if (!isSpeaking && (ascoltoContinuuoCheck.checked || ascoltoDiretto)) {
-          setTimeout(avviaMicrofono, 200);
-        } else if (!isSpeaking) {
-        if (!isSpeaking && !isStopped && (ascoltoContinuuoCheck.checked || ascoltoDiretto)) {
-          setTimeout(avviaMicrofono, 100);
-        } else if (!isSpeaking && !isStopped) {
+if (!isSpeaking && !isStopped && (ascoltoContinuuoCheck.checked || ascoltoDiretto)) {
+setTimeout(avviaMicrofono, 150);
+} else if (!isSpeaking && !isStopped) {
 orb.className = "orb";
 micStatus.textContent = "Microfono in pausa";
 }
@@ -488,11 +479,10 @@ if (event.error === "not-allowed") {
 micStatus.textContent = "Permesso microfono negato";
 ascoltoContinuuoCheck.checked = false;
 }
-        if (!isSpeaking) {
-        if (!isSpeaking && !isStopped) {
+if (!isSpeaking && !isStopped) {
 isListening = false;
 isManualStop = true;
-try { if (recognition) recognition.stop(); } catch(e) {}
+try { if (recognition) recognition.stop(); } catch (e) {}
 orb.className = "orb";
 micStatus.textContent = "Microfono in pausa";
 }
@@ -500,10 +490,9 @@ micStatus.textContent = "Microfono in pausa";
 }
 
 function inviaTesto() {
-const input = document.getElementById("testo-input");
-const testo = input.value.trim();
+const testo = testoInput.value.trim();
 if (!testo) return;
-input.value = "";
+testoInput.value = "";
 processaMessaggio(testo);
 if (window.innerWidth <= 768 && sidebar.classList.contains("open")) {
 sidebar.classList.remove("open");
@@ -516,100 +505,100 @@ const nuovaFinestra = window.open(url, "_blank", "noopener,noreferrer");
 return nuovaFinestra !== null;
 }
 
+function isRichiestaTecnicaOModifica(testoLower) {
+if (testoLower.length > 100) return true;
+const blocchi = [
+"modifica", "aggiorna", "auto-aggiorna", "autoaggiorna", "codice", "script",
+"html", "css", "js", "javascript", "python", "flask", "fastapi", "litellm",
+"api", "bug", "errore", "prompt", "routing", "main.py", "index.html",
+"github", "render", "commit", "file", "sorgente", "funzione", "endpoint"
+];
+return blocchi.some(parola => testoLower.includes(parola));
+}
+
 async function processaMessaggio(testo) {
 if (isStopped) return;
 
-      const input = document.getElementById("testo-input");
-      input.disabled = true;
-      document.querySelector(".send-btn").disabled = true;
-      stopBtn.disabled = false;
+setControlsDisabled(true);
 
-      window.speechSynthesis.cancel();
-      isSpeaking = false;
-      orb.className = "orb";
-      micStatus.textContent = "Elaborazione...";
+if (typeof window.speechSynthesis !== "undefined") {
+try { window.speechSynthesis.cancel(); } catch (e) {}
+}
+isSpeaking = false;
+orb.className = "orb";
+micStatus.textContent = "Elaborazione...";
 
-      if (isListening && recognition) {
-        try { recognition.abort(); } catch(e) {}
-        isListening = false;
-      }
+if (isListening && recognition) {
+try { recognition.abort(); } catch (e) {}
+isListening = false;
+}
 
 aggiungiMessaggio(testo, "user-msg");
 
-      const loadingDiv = document.createElement("div");
-      loadingDiv.className = "msg ai-msg loading-box";
-      loadingDiv.innerHTML = `<div class="spinner"></div><span>Zoe sta elaborando la risposta...</span>`;
-      chatContainer.appendChild(loadingDiv);
-      scrollToBottom();
+const testoLower = testo.toLowerCase().trim();
+const isComandoVideoBreve =
+!isRichiestaTecnicaOModifica(testoLower) &&
+/^(metti|riproduci|apri il video|fammi vedere|fammi sentire|ascolta|suona)\b/i.test(testoLower);
 
-const testoLower = testo.toLowerCase();
+if (isComandoVideoBreve) {
+const ricerca = testo
+.replace(/^(metti|riproduci|apri il video|fammi vedere|fammi sentire|ascolta|suona)\s+(su\s+youtube|youtube)?\s*/i, "")
+.replace(/\b(su youtube|youtube|per favore)\b/gi, "")
+.trim();
 
-if (testoLower.includes("youtube") || testoLower.includes("metti ") || testoLower.includes("ascolta ") || testoLower.includes("suona ")) {
-        loadingDiv.remove();
-const ricerca = testo.replace(/mi cerchi|cercami|cerca|su youtube|youtube|apri|metti|fammi ascoltare|suona|per favore/gi, "").trim();
+if (ricerca) {
 const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
 apriSchedaSicura(urlYt);
-const msgHtml = `Certo! Cerco su YouTube: <b>"${ricerca}"</b><br><a href="${urlYt}" target="_blank" class="link-btn">Apri su YouTube</a>`;
+const msgHtml = `Certo! Apro su YouTube: <b>"${ricerca}"</b><br><a href="${urlYt}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri su YouTube</a>`;
 aggiungiMessaggio(msgHtml, "ai-msg");
-if (voceAttiva.checked) parla(`Certo! Cerco su YouTube ${ricerca}`);
-        input.disabled = false;
-        document.querySelector(".send-btn").disabled = false;
-        stopBtn.disabled = true;
+if (voceAttiva.checked) parla(`Certo! Apro su YouTube ${ricerca}`);
+setControlsDisabled(false);
 return;
 }
+}
 
-if (testoLower.startsWith("cerca ") || testoLower.startsWith("cercami ") || testoLower.startsWith("mi cerchi ") || testoLower.startsWith("informazioni su ")) {
-        loadingDiv.remove();
+if (!isRichiestaTecnicaOModifica(testoLower) && /^(cerca |cercami |mi cerchi |informazioni su )/i.test(testoLower)) {
 const ricerca = testo.replace(/cerca su google|mi cerchi|cercami|cerca|informazioni su/gi, "").trim();
+if (ricerca) {
 const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
 apriSchedaSicura(urlGoogle);
-const msgHtml = `Ecco i risultati su Google per: <b>"${ricerca}"</b><br><a href="${urlGoogle}" target="_blank" class="link-btn">Apri risultati Google</a>`;
+const msgHtml = `Ecco i risultati su Google per: <b>"${ricerca}"</b><br><a href="${urlGoogle}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri risultati Google</a>`;
 aggiungiMessaggio(msgHtml, "ai-msg");
 if (voceAttiva.checked) parla(`Ecco i risultati su Google per ${ricerca}`);
-        input.disabled = false;
-        document.querySelector(".send-btn").disabled = false;
-        stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
+}
 }
 
 if (testoLower.includes("che ore") || testoLower === "ora") {
-        loadingDiv.remove();
 const oraCorrente = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 const msgRisposta = `Sono le ore ${oraCorrente}.`;
 aggiungiMessaggio(msgRisposta, "ai-msg");
 if (voceAttiva.checked) parla(msgRisposta);
 storicoChat.push({ role: "user", content: testo });
 storicoChat.push({ role: "assistant", content: msgRisposta });
-        input.disabled = false;
-        document.querySelector(".send-btn").disabled = false;
-        stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
 }
 
 if (testoLower.includes("data") || testoLower.includes("giorno è") || testoLower.includes("che giorno")) {
-        loadingDiv.remove();
 const oggi = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 const msgRisposta = `Oggi è ${oggi}.`;
 aggiungiMessaggio(msgRisposta, "ai-msg");
 if (voceAttiva.checked) parla(msgRisposta);
 storicoChat.push({ role: "user", content: testo });
 storicoChat.push({ role: "assistant", content: msgRisposta });
-        input.disabled = false;
-        document.querySelector(".send-btn").disabled = false;
-        stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
 }
 
-if (testoLower.includes("meteo") || testoLower.includes("tempo fa") || testoLower.includes("previsioni")) {
-        loadingDiv.remove();
+if (!isRichiestaTecnicaOModifica(testoLower) && (testoLower.includes("meteo") || testoLower.includes("tempo fa") || testoLower.includes("previsioni"))) {
 const urlMeteo = `https://www.google.com/search?q=meteo+torino`;
 apriSchedaSicura(urlMeteo);
-const msgHtml = `Ecco i risultati sul meteo aggiornati per Torino:<br><a href="${urlMeteo}" target="_blank" class="link-btn">Apri Meteo Torino</a>`;
+const msgHtml = `Ecco i risultati sul meteo aggiornati per Torino:<br><a href="${urlMeteo}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri Meteo Torino</a>`;
 aggiungiMessaggio(msgHtml, "ai-msg");
 if (voceAttiva.checked) parla("Ti ho aperto le previsioni del meteo per Torino.");
-        input.disabled = false;
-        document.querySelector(".send-btn").disabled = false;
-        stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
 }
 
@@ -618,39 +607,29 @@ conteggioImpegni++;
 statImpegni.textContent = conteggioImpegni;
 }
 
-if (testoLower.includes("immagine") || testoLower.includes("disegna") || testoLower.includes("disegnami")) {
-        loadingDiv.remove();
+if (!isRichiestaTecnicaOModifica(testoLower) && (testoLower.includes("immagine") || testoLower.includes("disegna") || testoLower.includes("disegnami"))) {
 const promptImg = testo.replace(/genera|crea|disegna|disegnami|fammi|mi|un'immagine|immagine|un disegno|di|per favore/gi, "").trim() || "paesaggio fantastico";
 const urlImmagine = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
 const imgHtml = `
-         Ecco l'immagine generata per <b>"${promptImg}"</b>:<br>
-         <img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
-         <a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" class="link-btn">Salva Immagine sul PC</a>
-       `;
-
+Ecco l'immagine generata per <b>"${promptImg}"</b>:<br>
+<img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
+<a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" rel="noopener noreferrer" class="link-btn">Salva Immagine sul PC</a>
+`;
 aggiungiMessaggio(imgHtml, "ai-msg");
 conteggioImmagini++;
 statImmagini.textContent = conteggioImmagini;
-
 storicoChat.push({ role: "user", content: testo });
 storicoChat.push({ role: "assistant", content: `Ho generato l'immagine richiesta: ${promptImg}` });
-        input.disabled = false;
-        document.querySelector(".send-btn").disabled = false;
-        stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
 }
 
-isStopped = false;
 abortController = new AbortController();
-      document.getElementById("testo-input").disabled = true;
-      document.querySelector(".send-btn").disabled = true;
-      stopBtn.disabled = false;
-
-      const loadingDiv = document.createElement("div");
-      loadingDiv.className = "msg ai-msg loading-box";
-      loadingDiv.innerHTML = `<div class="spinner"></div><span>Zoe sta elaborando la risposta...</span>`;
-      chatContainer.appendChild(loadingDiv);
-      chatContainer.scrollTop = chatContainer.scrollHeight;
+const loadingDiv = document.createElement("div");
+loadingDiv.className = "msg ai-msg loading-box";
+loadingDiv.innerHTML = `<div class="spinner"></div><span>Zoe sta elaborando la risposta...</span>`;
+chatContainer.appendChild(loadingDiv);
+scrollToBottom();
 
 try {
 const res = await fetch(`${SERVER_URL}/chiedi`, {
@@ -662,10 +641,7 @@ signal: abortController.signal
 
 if (isStopped) {
 loadingDiv.remove();
-          document.getElementById("testo-input").disabled = false;
-          input.disabled = false;
-document.querySelector(".send-btn").disabled = false;
-stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
 }
 
@@ -676,10 +652,7 @@ throw new Error(`HTTP ${res.status}`);
 const dati = await res.json();
 if (isStopped) {
 loadingDiv.remove();
-          document.getElementById("testo-input").disabled = false;
-          input.disabled = false;
-document.querySelector(".send-btn").disabled = false;
-stopBtn.disabled = true;
+setControlsDisabled(false);
 return;
 }
 
@@ -696,23 +669,13 @@ if (voceAttiva.checked && !isStopped) {
 parla(rispostaTesto);
 }
 } catch (err) {
-if (isStopped || err.name === 'AbortError') {
 loadingDiv.remove();
-          document.getElementById("testo-input").disabled = false;
-          input.disabled = false;
-document.querySelector(".send-btn").disabled = false;
-stopBtn.disabled = true;
-return;
-}
-loadingDiv.remove();
+if (!isStopped && err.name !== "AbortError") {
 aggiungiMessaggio(`Errore di connessione al server cloud (${err.message}).`, "ai-msg");
-} finally {
-if (!isStopped) {
-          document.getElementById("testo-input").disabled = false;
-          input.disabled = false;
-document.querySelector(".send-btn").disabled = false;
-stopBtn.disabled = true;
 }
+} finally {
+abortController = null;
+setControlsDisabled(false);
 }
 }
 
@@ -721,14 +684,13 @@ const div = document.createElement("div");
 div.className = `msg ${classe}`;
 div.innerHTML = htmlTesto;
 chatContainer.appendChild(div);
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-      scrollToBottom();
+scrollToBottom();
 }
 
 function nuovaChat() {
 chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
 storicoChat = [];
-      scrollToBottom();
+scrollToBottom();
 if (window.innerWidth <= 768) {
 sidebar.classList.remove("open");
 sidebarToggle.textContent = "☰";
@@ -736,23 +698,22 @@ sidebarToggle.textContent = "☰";
 }
 
 function parla(testo) {
-if (isStopped) return;
-      window.speechSynthesis.cancel();
-const testoPuro = testo.replace(/<[^>]*>?/gm, '');
+if (isStopped || typeof window.speechSynthesis === "undefined") return;
+try { window.speechSynthesis.cancel(); } catch (e) {}
+
+const testoPuro = testo.replace(/<[^>]*>?/gm, "").replace(/[*#]/g, "");
 const msg = new SpeechSynthesisUtterance(testoPuro);
 msg.lang = "it-IT";
 
-      const voci = window.speechSynthesis.getVoices();
-      const voceFemminile = voci.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('isabella') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it')))
-                          || voci.find(v => v.lang.startsWith('it'));
-      const voceFemminile = vociCache.find(v => v.lang === 'it-IT' && (v.name.toLowerCase().includes('isabella') || v.name.toLowerCase().includes('elsa') || v.name.toLowerCase().includes('alice') || v.name.toLowerCase().includes('federica') || v.name.toLowerCase().includes('google it')))
-                          || vociCache.find(v => v.lang.startsWith('it'));
+const voci = vociCache.length ? vociCache : window.speechSynthesis.getVoices();
+const voceFemminile = voci.find(v => v.lang === "it-IT" && (v.name.toLowerCase().includes("isabella") || v.name.toLowerCase().includes("elsa") || v.name.toLowerCase().includes("alice") || v.name.toLowerCase().includes("federica") || v.name.toLowerCase().includes("google it")))
+|| voci.find(v => v.lang.startsWith("it"));
 if (voceFemminile) msg.voice = voceFemminile;
 
 msg.onstart = () => {
 isSpeaking = true;
 isListening = false;
-try { if (recognition) recognition.stop(); } catch(e) {}
+try { if (recognition) recognition.stop(); } catch (e) {}
 orb.className = "orb speaking";
 micStatus.textContent = "Zoe sta parlando...";
 };
@@ -761,18 +722,15 @@ isSpeaking = false;
 orb.className = "orb";
 if (!isStopped && ascoltoContinuuoCheck.checked) avviaMicrofono();
 };
-      msg.onerror = () => {
-        isSpeaking = false;
-        orb.className = "orb";
-        if (!isStopped && ascoltoContinuuoCheck.checked) avviaMicrofono();
-      };
+msg.onerror = () => {
+isSpeaking = false;
+orb.className = "orb";
+if (!isStopped && ascoltoContinuuoCheck.checked) avviaMicrofono();
+};
 window.speechSynthesis.speak(msg);
 }
-
-    if ('onvoiceschanged' in window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
 
 ascoltoContinuuoCheck.addEventListener("change", gestisciAscoltoContinu);
 </script>
 </body>
+</html>
