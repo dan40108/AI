@@ -2,6 +2,7 @@ import asyncio
 import base64
 import os
 import re
+import time
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -195,6 +196,7 @@ def _estrai_citta_e_giorno(testo: str) -> tuple[str, int, str]:
 
 
 async def ottieni_meteo_dinamico(testo: str) -> dict:
+    t_inizio = time.perf_counter()
     citta, giorno_idx, etichetta = _estrai_citta_e_giorno(testo)
     url_fallback = f"https://www.google.com/search?q=meteo+{httpx.QueryParams({'q': citta})['q']}" + ("+domani" if giorno_idx == 1 else "")
 
@@ -212,6 +214,7 @@ async def ottieni_meteo_dinamico(testo: str) -> dict:
                 return {
                     "risposta": f"Non ho trovato la località {citta}. Ti apro la ricerca meteo su Google.",
                     "url": url_fallback,
+                    "durata_sec": round(time.perf_counter() - t_inizio, 2),
                 }
 
             loc = risultati[0]
@@ -243,6 +246,7 @@ async def ottieni_meteo_dinamico(testo: str) -> dict:
             return {
                 "risposta": f"Non ho trovato i dati meteo per {nome_citta} per {etichetta}.",
                 "url": url_fallback,
+                "durata_sec": round(time.perf_counter() - t_inizio, 2),
             }
 
         desc_giorno = WMO_METEO_IT.get(codici[giorno_idx], "condizioni variabili")
@@ -264,35 +268,63 @@ async def ottieni_meteo_dinamico(testo: str) -> dict:
             )
 
         url_citta = f"https://www.google.com/search?q=meteo+{httpx.QueryParams({'q': nome_citta})['q']}" + ("+domani" if giorno_idx == 1 else "")
-        return {"risposta": risposta, "url": url_citta}
+        return {
+            "risposta": risposta,
+            "url": url_citta,
+            "durata_sec": round(time.perf_counter() - t_inizio, 2),
+        }
 
     except Exception:
         return {
             "risposta": f"Ecco le previsioni meteo per {citta} ({etichetta}).",
             "url": url_fallback,
+            "durata_sec": round(time.perf_counter() - t_inizio, 2),
         }
 
 
-def _chiama_modelli_sync(modelli: list[str], messaggi: list[dict]) -> tuple[str, str]:
+def _chiama_modelli_sync(modelli: list[str], messaggi: list[dict]) -> tuple[str, str, dict]:
     errori = []
+    rate_limit_rilevati = []
+    t_inizio = time.perf_counter()
+
     for modello in modelli:
         try:
             risposta = completion(model=modello, messages=messaggi)
             testo_risposta = risposta.choices[0].message.content
             if testo_risposta and testo_risposta.strip():
-                return testo_risposta, f"{modello} (Agent)"
+                durata_totale = round(time.perf_counter() - t_inizio, 2)
+                telemetria = {
+                    "agente": modello,
+                    "durata_sec": durata_totale,
+                    "rate_limit": len(rate_limit_rilevati) > 0,
+                    "dettagli_rate_limit": rate_limit_rilevati,
+                    "fallback_usato": len(errori) > 0,
+                }
+                return testo_risposta, f"{modello} (Agent)", telemetria
         except Exception as e:
-            errori.append(f"{modello}: {str(e)[:60]}")
+            err_str = str(e)
+            err_lower = err_str.lower()
+            if "429" in err_lower or "rate limit" in err_lower or "ratelimit" in err_lower or "quota" in err_lower:
+                rate_limit_rilevati.append(f"{modello}: rate-limit/quota")
+            errori.append(f"{modello}: {err_str[:60]}")
             continue
-    raise Exception("Tutti i modelli hanno fallito: " + " | ".join(errori))
+
+    durata_totale = round(time.perf_counter() - t_inizio, 2)
+    raise RuntimeError(
+        f"Tutti i modelli hanno fallito ({durata_totale}s): " + " | ".join(errori)
+    )
 
 
 async def esegui_modello(modelli: list[str], messaggi: list[dict], timeout_sec: float = 60.0) -> dict:
-    testo_risposta, modello_agent = await asyncio.wait_for(
+    testo_risposta, modello_agent, telemetria = await asyncio.wait_for(
         asyncio.to_thread(_chiama_modelli_sync, modelli, messaggi),
         timeout=timeout_sec,
     )
-    return {"risposta": testo_risposta, "modello": modello_agent}
+    return {
+        "risposta": testo_risposta,
+        "modello": modello_agent,
+        "telemetria": telemetria,
+    }
 
 
 @app.get("/")
@@ -347,7 +379,11 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
         )
         nuovo_codice = _pulisci_blocco_codice(res["risposta"])
         if not nuovo_codice or len(nuovo_codice) < 40:
-            return {"risposta": "Il modello ha restituito un codice vuoto o troppo corto; commit annullato.", "modello": res["modello"]}
+            return {
+                "risposta": "Il modello ha restituito un codice vuoto o troppo corto; commit annullato.",
+                "modello": res["modello"],
+                "telemetria": res.get("telemetria"),
+            }
 
         if target_file == "main.py":
             compile(nuovo_codice, "main.py", "exec")
@@ -357,6 +393,7 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
             return {
                 "risposta": f"Commit bloccato per sicurezza: {motivo_blocco}",
                 "modello": "content-guard",
+                "telemetria": res.get("telemetria"),
             }
 
         commit_short = await scrivi_file_github(
@@ -368,6 +405,7 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
         return {
             "risposta": f"Ho aggiornato {target_file} su GitHub (commit {commit_short}). Render/GitHub Pages avvieranno l'aggiornamento automatico.",
             "modello": res["modello"],
+            "telemetria": res.get("telemetria"),
         }
     except SyntaxError as se:
         return {"risposta": f"Modifica bloccata: errore di sintassi Python alla riga {se.lineno}: {se.msg}.", "modello": "syntax-guard"}
@@ -391,6 +429,13 @@ async def chiedi(req: Richiesta):
             "url": dati_meteo["url"],
             "azione": "apri_link",
             "modello": "open-meteo",
+            "telemetria": {
+                "agente": "Open-Meteo",
+                "durata_sec": dati_meteo.get("durata_sec", 0.0),
+                "rate_limit": False,
+                "dettagli_rate_limit": [],
+                "fallback_usato": False,
+            },
         }
 
     is_auto_apply = any(k in testo_lower for k in [
