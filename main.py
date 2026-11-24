@@ -311,10 +311,21 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
     except Exception as e:
         return {"risposta": f"Errore lettura {target_file} da GitHub: {str(e)}", "modello": "github-read-error"}
 
+    if target_file == "index.html":
+        regola_formato = (
+            "Il file di destinazione è index.html: devi restituire ESCLUSIVAMENTE codice HTML completo "
+            "che inizi con <!DOCTYPE html> o <html e termini con </html>. "
+            "Non scrivere MAI codice Python, MAI commenti introduttivi, MAI spiegazioni prima o dopo, MAI emoji e MAI asterischi."
+        )
+    else:
+        regola_formato = (
+            "Il file di destinazione è main.py: devi restituire ESCLUSIVAMENTE codice Python valido e completo "
+            "senza markup HTML, senza commenti introduttivi, senza spiegazioni, senza emoji e senza asterischi."
+        )
+
     system_prompt = (
         "Sei l'Agente Meta-Programmatore di Zoe. Ricevi il file sorgente attuale e un'istruzione di modifica. "
-        "Restituisci ESCLUSIVAMENTE il nuovo file completo e funzionante, senza commenti introduttivi, "
-        "senza spiegazioni, senza emoji e senza asterischi."
+        f"{regola_formato}"
     )
     user_prompt = (
         f"File: {target_file}\n"
@@ -323,8 +334,8 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
     )
 
     modelli_coder = [
-        "groq/llama-3.3-70b-versatile",
         "gemini/gemini-2.0-flash",
+        "groq/llama-3.3-70b-versatile",
         "openrouter/openrouter/free",
     ]
 
@@ -419,6 +430,7 @@ async def chiedi(req: Richiesta):
         for m in req.storico[-6:]:
             messaggi.append({"role": m["role"], "content": m["content"]})
         messaggi.append({"role": "user", "content": f"{req.testo}{contesto_file}"})
+        timeout_richiesta = 180.0
     else:
         system_prompt = (
             "Ti chiami Zoe e sei un'assistente di co-working intelligente e informale. "
@@ -433,9 +445,10 @@ async def chiedi(req: Richiesta):
         for m in req.storico[-6:]:
             messaggi.append({"role": m["role"], "content": m["content"]})
         messaggi.append({"role": "user", "content": req.testo})
+        timeout_richiesta = 60.0
 
     try:
-        return await esegui_modello(modelli, messaggi, timeout_sec=60.0)
+        return await esegui_modello(modelli, messaggi, timeout_sec=timeout_richiesta)
     except asyncio.TimeoutError:
         return {
             "risposta": "Errore critico: Nessun agente ha risposto entro 60 secondi. È colpa di Gemini e dei server cloud che stanno impiegando troppo tempo.",
