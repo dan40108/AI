@@ -21,6 +21,30 @@ GITHUB_REPO = "dan40108/AI"
 GITHUB_BRANCH = "main"
 FILE_CONSENTITI = {"main.py", "index.html"}
 
+WMO_METEO_IT = {
+    0: "cielo sereno",
+    1: "prevalentemente sereno",
+    2: "parzialmente nuvoloso",
+    3: "coperto",
+    45: "nebbia",
+    48: "nebbia con brina",
+    51: "pioviggine leggera",
+    53: "pioviggine moderata",
+    55: "pioviggine intensa",
+    61: "pioggia debole",
+    63: "pioggia moderata",
+    65: "pioggia forte",
+    71: "neve debole",
+    73: "neve moderata",
+    75: "neve intensa",
+    80: "rovesci leggeri",
+    81: "rovesci moderati",
+    82: "rovesci violenti",
+    95: "temporale",
+    96: "temporale con grandine",
+    99: "forte temporale con grandine",
+}
+
 
 class Richiesta(BaseModel):
     testo: str
@@ -99,6 +123,156 @@ def _pulisci_blocco_codice(testo_llm: str) -> str:
     return testo_llm
 
 
+def _valida_coerenza_file(target_file: str, contenuto: str) -> tuple[bool, str]:
+    testo_check = contenuto.strip()
+    lower = testo_check.lower()
+
+    if target_file == "index.html":
+        ha_html = ("<!doctype html" in lower) or ("<html" in lower) or ("<body" in lower) or ("<div" in lower)
+        sembra_python = bool(
+            re.search(r"^\s*(from\s+\w+|import\s+\w+|def\s+\w+|async\s+def\s+\w+|@app\.)", testo_check, re.MULTILINE)
+        )
+        if not ha_html or sembra_python:
+            return False, "Il contenuto generato non è HTML valido per index.html (sembra codice Python o testo non HTML)."
+        return True, ""
+
+    if target_file == "main.py":
+        sembra_html = ("<!doctype html" in lower) or ("<html" in lower)
+        ha_python = ("def " in testo_check) or ("import " in testo_check)
+        if sembra_html or not ha_python:
+            return False, "Il contenuto generato non sembra codice Python valido per main.py."
+        return True, ""
+
+    return False, "File non supportato."
+
+
+def _è_richiesta_meteo(testo: str) -> bool:
+    testo_lower = testo.lower().strip()
+    if len(testo_lower) > 95:
+        return False
+    parole_tecniche = [
+        "codice", "script", "html", "css", "js", "python", "fastapi", "litellm",
+        "modifica", "aggiorna", "auto-aggiorna", "bug", "prompt", "main.py", "index.html", "github", "render"
+    ]
+    if any(p in testo_lower for p in parole_tecniche):
+        return False
+    return any(k in testo_lower for k in ["meteo", "che tempo", "previsioni"])
+
+
+def _estrai_citta_e_giorno(testo: str) -> tuple[str, int, str]:
+    lower = testo.lower()
+    if "dopodomani" in lower:
+        giorno_idx, etichetta = 2, "dopodomani"
+    elif "domani" in lower:
+        giorno_idx, etichetta = 1, "domani"
+    else:
+        giorno_idx, etichetta = 0, "oggi"
+
+    match_prep = re.search(
+        r"\b(?:a|ad|per|su|in|di)\s+([a-zA-ZÀ-ÿ'’\-]+(?:\s+[a-zA-ZÀ-ÿ'’\-]+){0,2})",
+        testo,
+        re.IGNORECASE,
+    )
+    if match_prep:
+        candidato = match_prep.group(1)
+        candidato = re.sub(
+            r"\b(oggi|domani|dopodomani|adesso|ora|subito|per favore|grazie)\b",
+            "",
+            candidato,
+            flags=re.IGNORECASE,
+        ).strip(" ?.,!\"'")
+        if candidato and candidato.lower() not in {"il", "la", "lo", "le", "gli", "un", "una", "uno", "citta", "città"}:
+            return candidato.title(), giorno_idx, etichetta
+
+    ripulito = re.sub(
+        r"\b(zoe|che|tempo|fa|farà|meteo|previsioni|del|per|oggi|domani|dopodomani|a|ad|in|su|di|dimmi|dici|mi)\b",
+        "",
+        testo,
+        flags=re.IGNORECASE,
+    ).strip(" ?.,!\"'")
+    citta = ripulito.title() if ripulito else "Torino"
+    return citta, giorno_idx, etichetta
+
+
+async def ottieni_meteo_dinamico(testo: str) -> dict:
+    citta, giorno_idx, etichetta = _estrai_citta_e_giorno(testo)
+    url_fallback = f"https://www.google.com/search?q=meteo+{httpx.QueryParams({'q': citta})['q']}" + ("+domani" if giorno_idx == 1 else "")
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            geo_resp = await client.get(
+                "https://geocoding-api.open-meteo.com/v1/search",
+                params={"name": citta, "count": 1, "language": "it", "format": "json"},
+            )
+            geo_resp.raise_for_status()
+            geo_data = geo_resp.json()
+
+            risultati = geo_data.get("results") or []
+            if not risultati:
+                return {
+                    "risposta": f"Non ho trovato la località {citta}. Ti apro la ricerca meteo su Google.",
+                    "url": url_fallback,
+                }
+
+            loc = risultati[0]
+            nome_citta = loc.get("name", citta)
+            lat = loc["latitude"]
+            lon = loc["longitude"]
+
+            meteo_resp = await client.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": "temperature_2m,weather_code",
+                    "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+                    "timezone": "auto",
+                    "forecast_days": 3,
+                },
+            )
+            meteo_resp.raise_for_status()
+            dati = meteo_resp.json()
+
+        daily = dati.get("daily", {})
+        codici = daily.get("weather_code", [])
+        t_min_list = daily.get("temperature_2m_min", [])
+        t_max_list = daily.get("temperature_2m_max", [])
+        prob_list = daily.get("precipitation_probability_max", [])
+
+        if giorno_idx >= len(codici) or giorno_idx >= len(t_min_list) or giorno_idx >= len(t_max_list):
+            return {
+                "risposta": f"Non ho trovato i dati meteo per {nome_citta} per {etichetta}.",
+                "url": url_fallback,
+            }
+
+        desc_giorno = WMO_METEO_IT.get(codici[giorno_idx], "condizioni variabili")
+        t_min = round(t_min_list[giorno_idx])
+        t_max = round(t_max_list[giorno_idx])
+        prob_pioggia = prob_list[giorno_idx] if giorno_idx < len(prob_list) and prob_list[giorno_idx] is not None else 0
+
+        if giorno_idx == 0 and dati.get("current"):
+            t_attuale = round(dati["current"]["temperature_2m"])
+            desc_attuale = WMO_METEO_IT.get(dati["current"]["weather_code"], desc_giorno)
+            risposta = (
+                f"A {nome_citta} oggi ci sono {t_attuale} gradi con {desc_attuale}. "
+                f"Minima {t_min} gradi, massima {t_max} gradi, probabilità di pioggia {prob_pioggia} percento."
+            )
+        else:
+            risposta = (
+                f"A {nome_citta} per {etichetta} è previsto {desc_giorno}, "
+                f"con minima di {t_min} gradi, massima di {t_max} gradi e probabilità di pioggia del {prob_pioggia} percento."
+            )
+
+        url_citta = f"https://www.google.com/search?q=meteo+{httpx.QueryParams({'q': nome_citta})['q']}" + ("+domani" if giorno_idx == 1 else "")
+        return {"risposta": risposta, "url": url_citta}
+
+    except Exception:
+        return {
+            "risposta": f"Ecco le previsioni meteo per {citta} ({etichetta}).",
+            "url": url_fallback,
+        }
+
+
 def _chiama_modelli_sync(modelli: list[str], messaggi: list[dict]) -> tuple[str, str]:
     errori = []
     for modello in modelli:
@@ -167,6 +341,13 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
         if target_file == "main.py":
             compile(nuovo_codice, "main.py", "exec")
 
+        ok_file, motivo_blocco = _valida_coerenza_file(target_file, nuovo_codice)
+        if not ok_file:
+            return {
+                "risposta": f"Commit bloccato per sicurezza: {motivo_blocco}",
+                "modello": "content-guard",
+            }
+
         commit_short = await scrivi_file_github(
             target_file,
             nuovo_codice,
@@ -191,6 +372,15 @@ async def auto_aggiorna(req: RichiestaAutoAggiorna):
 @app.post("/chiedi")
 async def chiedi(req: Richiesta):
     testo_lower = req.testo.lower()
+
+    if _è_richiesta_meteo(req.testo):
+        dati_meteo = await ottieni_meteo_dinamico(req.testo)
+        return {
+            "risposta": dati_meteo["risposta"],
+            "url": dati_meteo["url"],
+            "azione": "apri_link",
+            "modello": "open-meteo",
+        }
 
     is_auto_apply = any(k in testo_lower for k in [
         "aggiorna il tuo codice", "modifica il tuo codice", "applica la modifica",
