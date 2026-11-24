@@ -97,6 +97,31 @@ text-decoration: none; font-size: 0.9rem; font-weight: 600; min-height: 44px; te
 }
 .link-btn:hover { background: var(--accent-hover); }
 
+#agent-monitor {
+margin: 0 16px 8px 16px;
+padding: 10px 14px;
+background: var(--bg-panel);
+border: 1px solid var(--border-color);
+border-radius: 10px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+gap: 12px;
+flex-wrap: wrap;
+font-size: 0.82rem;
+color: var(--text-muted);
+}
+.monitor-item {
+display: flex;
+align-items: center;
+gap: 6px;
+min-width: 0;
+}
+.monitor-item b {
+color: var(--text-main);
+font-weight: 600;
+}
+
 .input-footer {
 padding: 14px 16px; background: var(--bg-sidebar); border-top: 1px solid var(--border-color);
 display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap;
@@ -181,6 +206,8 @@ h1 { font-size: 1.1rem; }
 #chat-container { padding: 16px 12px; gap: 12px; }
 .msg { padding: 11px 14px; border-radius: 12px; max-width: 90%; font-size: 0.95rem; line-height: 1.5; }
 
+#agent-monitor { margin: 0 12px 6px 12px; padding: 8px 12px; gap: 8px; font-size: 0.76rem; }
+
 .input-footer { padding: 12px; gap: 10px; }
 .orb { width: 44px; height: 44px; min-width: 44px; }
 .input-wrapper { border-radius: 8px; min-height: 44px; }
@@ -263,6 +290,12 @@ header { padding: 10px 14px; gap: 8px; }
 <div class="msg ai-msg">Ciao! Sono Zoe. Parlami liberamente dicendo il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b>, <b>"Zoe, che tempo fa oggi?"</b>, <b>"Zoe, disegna un gatto cyberpunk"</b>) oppure scrivimi qui sotto.</div>
 </div>
 
+<div id="agent-monitor" aria-live="polite">
+<div class="monitor-item"><b>Agente:</b> <span id="mon-agente">In attesa</span></div>
+<div class="monitor-item"><b>Tempo:</b> <span id="mon-tempo">0.0s</span></div>
+<div class="monitor-item"><b>Stato API:</b> <span id="mon-stato" style="color: #10b981;">Pronto</span></div>
+</div>
+
 <div id="model-badge"></div>
 
 <div class="input-footer">
@@ -289,6 +322,8 @@ let isStopped = false;
 let abortController = null;
 let rAFScroll = null;
 let vociCache = [];
+let monTimerInterval = null;
+let monStartTime = 0;
 
 const chatContainer = document.getElementById("chat-container");
 const orb = document.getElementById("orb");
@@ -303,6 +338,9 @@ const sendBtn = document.getElementById("send-btn");
 const testoInput = document.getElementById("testo-input");
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
+const monAgente = document.getElementById("mon-agente");
+const monTempo = document.getElementById("mon-tempo");
+const monStato = document.getElementById("mon-stato");
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = SpeechRecognition ? new SpeechRecognition() : null;
@@ -317,6 +355,54 @@ const loadVoices = () => { vociCache = window.speechSynthesis.getVoices(); };
 loadVoices();
 if (window.speechSynthesis.onvoiceschanged !== undefined) {
 window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+}
+
+function avviaMonitorAgente(nomeAgente) {
+if (!monAgente || !monTempo || !monStato) return;
+if (monTimerInterval) clearInterval(monTimerInterval);
+monStartTime = performance.now();
+monAgente.textContent = nomeAgente;
+monTempo.textContent = "0.0s";
+monStato.textContent = "In corso...";
+monStato.style.color = "#38bdf8";
+
+monTimerInterval = setInterval(() => {
+const sec = ((performance.now() - monStartTime) / 1000).toFixed(1);
+monTempo.textContent = `${sec}s`;
+}, 100);
+}
+
+function aggiornaMonitorFine(dati, erroreTesto = null) {
+if (monTimerInterval) {
+clearInterval(monTimerInterval);
+monTimerInterval = null;
+}
+if (!monAgente || !monTempo || !monStato) return;
+
+const secFinali = ((performance.now() - monStartTime) / 1000).toFixed(1);
+const tel = (dati && dati.telemetria) || {};
+
+if (tel.agente) {
+monAgente.textContent = tel.agente;
+} else if (dati && dati.modello) {
+monAgente.textContent = dati.modello;
+}
+
+monTempo.textContent = `${tel.durata_sec ?? secFinali}s`;
+
+if (erroreTesto) {
+monStato.textContent = erroreTesto;
+monStato.style.color = "#ef4444";
+} else if (tel.rate_limit) {
+const dettagli = Array.isArray(tel.dettagli_rate_limit) && tel.dettagli_rate_limit.length
+? tel.dettagli_rate_limit.join(", ")
+: "429 / quota";
+monStato.textContent = `Rate-limit (${dettagli})`;
+monStato.style.color = "#f59e0b";
+} else {
+monStato.textContent = "OK";
+monStato.style.color = "#10b981";
 }
 }
 
@@ -356,6 +442,7 @@ try { abortController.abort(); } catch (e) {}
 abortController = null;
 }
 document.querySelectorAll(".loading-box").forEach(el => el.remove());
+aggiornaMonitorFine(null, "Interrotto");
 orb.className = "orb";
 micStatus.textContent = "Interrotto";
 setControlsDisabled(false);
@@ -638,9 +725,10 @@ statImpegni.textContent = conteggioImpegni;
 if (!isRichiestaTecnicaOModifica(testoLower) && (testoLower.includes("immagine") || testoLower.includes("disegna") || testoLower.includes("disegnami"))) {
 const promptImg = testo.replace(/genera|crea|disegna|disegnami|fammi|mi|un'immagine|immagine|un disegno|di|per favore/gi, "").trim() || "paesaggio fantastico";
 const urlImmagine = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
+avviaMonitorAgente("Pollinations (Immagini)");
 const imgHtml = `
 Ecco l'immagine generata per <b>"${escapeHtml(promptImg)}"</b>:<br>
-<img src="${escapeHtml(urlImmagine)}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
+<img src="${escapeHtml(urlImmagine)}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata" onload="aggiornaMonitorFine({ telemetria: { agente: 'Pollinations (Immagini)', rate_limit: false } })" onerror="aggiornaMonitorFine(null, 'Errore immagine')"><br>
 <a href="${escapeHtml(urlImmagine)}" download="zoe_immagine.jpg" target="_blank" rel="noopener noreferrer" class="link-btn">Salva Immagine sul PC</a>
 `;
 aggiungiMessaggio(imgHtml, "ai-msg");
@@ -658,6 +746,7 @@ loadingDiv.className = "msg ai-msg loading-box";
 loadingDiv.innerHTML = `<div class="spinner"></div><span>Zoe sta elaborando la risposta...</span>`;
 chatContainer.appendChild(loadingDiv);
 scrollToBottom();
+avviaMonitorAgente(isRichiestaTecnicaOModifica(testoLower) ? "Meta-Coder / Agenti" : "Agenti Chat");
 
 try {
 const res = await fetch(`${SERVER_URL}/chiedi`, {
@@ -669,6 +758,7 @@ signal: abortController.signal
 
 if (isStopped) {
 loadingDiv.remove();
+aggiornaMonitorFine(null, "Interrotto");
 setControlsDisabled(false);
 return;
 }
@@ -680,6 +770,7 @@ throw new Error(`HTTP ${res.status}`);
 const dati = await res.json();
 if (isStopped) {
 loadingDiv.remove();
+aggiornaMonitorFine(null, "Interrotto");
 setControlsDisabled(false);
 return;
 }
@@ -695,6 +786,7 @@ htmlFinale += `<br><a href="${escapeHtml(dati.url)}" target="_blank" rel="noopen
 
 aggiungiMessaggio(htmlFinale, "ai-msg");
 if (dati.modello) badgeEl.textContent = `Modello: ${dati.modello}`;
+aggiornaMonitorFine(dati);
 
 storicoChat.push({ role: "user", content: testo });
 storicoChat.push({ role: "assistant", content: rispostaTesto });
@@ -705,6 +797,7 @@ parla(rispostaTesto);
 } catch (err) {
 loadingDiv.remove();
 if (!isStopped && err.name !== "AbortError") {
+aggiornaMonitorFine(null, `Errore (${err.message})`);
 aggiungiMessaggio(`Errore di connessione al server cloud (${escapeHtml(err.message)}).`, "ai-msg");
 }
 } finally {
