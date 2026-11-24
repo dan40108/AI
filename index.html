@@ -501,8 +501,24 @@ sidebarToggle.textContent = "☰";
 }
 
 function apriSchedaSicura(url) {
-const nuovaFinestra = window.open(url, "_blank", "noopener,noreferrer");
+if (!url || typeof url !== "string") return false;
+try {
+const parsed = new URL(url);
+if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+const nuovaFinestra = window.open(parsed.href, "_blank", "noopener,noreferrer");
 return nuovaFinestra !== null;
+} catch (e) {
+return false;
+}
+}
+
+function escapeHtml(testo) {
+return String(testo)
+.replace(/&/g, "&amp;")
+.replace(/</g, "&lt;")
+.replace(/>/g, "&gt;")
+.replace(/"/g, "&quot;")
+.replace(/'/g, "&#39;");
 }
 
 function isRichiestaTecnicaOModifica(testoLower) {
@@ -533,7 +549,7 @@ try { recognition.abort(); } catch (e) {}
 isListening = false;
 }
 
-aggiungiMessaggio(testo, "user-msg");
+aggiungiMessaggio(escapeHtml(testo), "user-msg");
 
 const testoLower = testo.toLowerCase().trim();
 const isComandoVideoBreve =
@@ -549,7 +565,7 @@ const ricerca = testo
 if (ricerca) {
 const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
 apriSchedaSicura(urlYt);
-const msgHtml = `Certo! Apro su YouTube: <b>"${ricerca}"</b><br><a href="${urlYt}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri su YouTube</a>`;
+const msgHtml = `Certo! Apro su YouTube: <b>"${escapeHtml(ricerca)}"</b><br><a href="${escapeHtml(urlYt)}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri su YouTube</a>`;
 aggiungiMessaggio(msgHtml, "ai-msg");
 if (voceAttiva.checked) parla(`Certo! Apro su YouTube ${ricerca}`);
 setControlsDisabled(false);
@@ -562,7 +578,7 @@ const ricerca = testo.replace(/cerca su google|mi cerchi|cercami|cerca|informazi
 if (ricerca) {
 const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
 apriSchedaSicura(urlGoogle);
-const msgHtml = `Ecco i risultati su Google per: <b>"${ricerca}"</b><br><a href="${urlGoogle}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri risultati Google</a>`;
+const msgHtml = `Ecco i risultati su Google per: <b>"${escapeHtml(ricerca)}"</b><br><a href="${escapeHtml(urlGoogle)}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri risultati Google</a>`;
 aggiungiMessaggio(msgHtml, "ai-msg");
 if (voceAttiva.checked) parla(`Ecco i risultati su Google per ${ricerca}`);
 setControlsDisabled(false);
@@ -573,7 +589,7 @@ return;
 if (testoLower.includes("che ore") || testoLower === "ora") {
 const oraCorrente = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 const msgRisposta = `Sono le ore ${oraCorrente}.`;
-aggiungiMessaggio(msgRisposta, "ai-msg");
+aggiungiMessaggio(escapeHtml(msgRisposta), "ai-msg");
 if (voceAttiva.checked) parla(msgRisposta);
 storicoChat.push({ role: "user", content: testo });
 storicoChat.push({ role: "assistant", content: msgRisposta });
@@ -584,20 +600,10 @@ return;
 if (testoLower.includes("data") || testoLower.includes("giorno è") || testoLower.includes("che giorno")) {
 const oggi = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 const msgRisposta = `Oggi è ${oggi}.`;
-aggiungiMessaggio(msgRisposta, "ai-msg");
+aggiungiMessaggio(escapeHtml(msgRisposta), "ai-msg");
 if (voceAttiva.checked) parla(msgRisposta);
 storicoChat.push({ role: "user", content: testo });
 storicoChat.push({ role: "assistant", content: msgRisposta });
-setControlsDisabled(false);
-return;
-}
-
-if (!isRichiestaTecnicaOModifica(testoLower) && (testoLower.includes("meteo") || testoLower.includes("tempo fa") || testoLower.includes("previsioni"))) {
-const urlMeteo = `https://www.google.com/search?q=meteo+torino`;
-apriSchedaSicura(urlMeteo);
-const msgHtml = `Ecco i risultati sul meteo aggiornati per Torino:<br><a href="${urlMeteo}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri Meteo Torino</a>`;
-aggiungiMessaggio(msgHtml, "ai-msg");
-if (voceAttiva.checked) parla("Ti ho aperto le previsioni del meteo per Torino.");
 setControlsDisabled(false);
 return;
 }
@@ -611,9 +617,9 @@ if (!isRichiestaTecnicaOModifica(testoLower) && (testoLower.includes("immagine")
 const promptImg = testo.replace(/genera|crea|disegna|disegnami|fammi|mi|un'immagine|immagine|un disegno|di|per favore/gi, "").trim() || "paesaggio fantastico";
 const urlImmagine = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptImg)}?width=512&height=512&nologo=true`;
 const imgHtml = `
-Ecco l'immagine generata per <b>"${promptImg}"</b>:<br>
-<img src="${urlImmagine}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
-<a href="${urlImmagine}" download="zoe_immagine.jpg" target="_blank" rel="noopener noreferrer" class="link-btn">Salva Immagine sul PC</a>
+Ecco l'immagine generata per <b>"${escapeHtml(promptImg)}"</b>:<br>
+<img src="${escapeHtml(urlImmagine)}" style="display:block; max-width:100%; border-radius:8px; margin-top:8px;" alt="Immagine generata"><br>
+<a href="${escapeHtml(urlImmagine)}" download="zoe_immagine.jpg" target="_blank" rel="noopener noreferrer" class="link-btn">Salva Immagine sul PC</a>
 `;
 aggiungiMessaggio(imgHtml, "ai-msg");
 conteggioImmagini++;
@@ -659,7 +665,13 @@ return;
 loadingDiv.remove();
 
 const rispostaTesto = dati.risposta || "Nessuna risposta ricevuta dal server.";
-aggiungiMessaggio(rispostaTesto, "ai-msg");
+let htmlFinale = escapeHtml(rispostaTesto);
+if (dati.url) {
+apriSchedaSicura(dati.url);
+htmlFinale += `<br><a href="${escapeHtml(dati.url)}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri link</a>`;
+}
+
+aggiungiMessaggio(htmlFinale, "ai-msg");
 if (dati.modello) badgeEl.textContent = `Modello: ${dati.modello}`;
 
 storicoChat.push({ role: "user", content: testo });
@@ -671,7 +683,7 @@ parla(rispostaTesto);
 } catch (err) {
 loadingDiv.remove();
 if (!isStopped && err.name !== "AbortError") {
-aggiungiMessaggio(`Errore di connessione al server cloud (${err.message}).`, "ai-msg");
+aggiungiMessaggio(`Errore di connessione al server cloud (${escapeHtml(err.message)}).`, "ai-msg");
 }
 } finally {
 abortController = null;
@@ -701,7 +713,13 @@ function parla(testo) {
 if (isStopped || typeof window.speechSynthesis === "undefined") return;
 try { window.speechSynthesis.cancel(); } catch (e) {}
 
-const testoPuro = testo.replace(/<[^>]*>?/gm, "").replace(/[*#]/g, "");
+const testoPuro = testo
+.replace(/<[^>]*>?/gm, "")
+.replace(/[*#]/g, "")
+.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+.trim();
+if (!testoPuro) return;
+
 const msg = new SpeechSynthesisUtterance(testoPuro);
 msg.lang = "it-IT";
 
