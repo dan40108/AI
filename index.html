@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Zoe & AI - Dashboard</title>
+<title>Zoe</title>
 <style>
 :root {
 --bg-main: #090d16;
@@ -59,7 +59,7 @@ header {
 padding: 16px 20px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color);
 display: flex; flex-direction: column; gap: 14px; flex-shrink: 0;
 }
-.header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.header-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; }
 
 .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
@@ -98,7 +98,7 @@ text-decoration: none; font-size: 0.9rem; font-weight: 600; min-height: 44px; te
 .link-btn:hover { background: var(--accent-hover); }
 
 #agent-monitor {
-margin: 0 16px 8px 16px;
+margin: 0 16px 10px 16px;
 padding: 10px 14px;
 background: var(--bg-panel);
 border: 1px solid var(--border-color);
@@ -165,14 +165,7 @@ border-radius: 10px; font-size: 0.9rem; min-width: 72px; min-height: 48px;
 .stop-btn:active { background: var(--danger); }
 .stop-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.controls-panel { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
-#mic-status { font-size: 0.8rem; color: #38bdf8; white-space: nowrap; }
-#model-badge { font-size: 0.75rem; color: var(--text-muted); padding: 0 16px 8px 16px; text-align: right; width: 100%; }
-.auto-update-badge {
-font-size: 0.75rem;
-color: var(--accent);
-white-space: nowrap;
-}
+.controls-panel { display: flex; align-items: center; gap: 14px; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
 
 label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
@@ -206,7 +199,7 @@ h1 { font-size: 1.1rem; }
 #chat-container { padding: 16px 12px; gap: 12px; }
 .msg { padding: 11px 14px; border-radius: 12px; max-width: 90%; font-size: 0.95rem; line-height: 1.5; }
 
-#agent-monitor { margin: 0 12px 6px 12px; padding: 8px 12px; gap: 8px; font-size: 0.76rem; }
+#agent-monitor { margin: 0 12px 8px 12px; padding: 8px 12px; gap: 8px; font-size: 0.76rem; }
 
 .input-footer { padding: 12px; gap: 10px; }
 .orb { width: 44px; height: 44px; min-width: 44px; }
@@ -216,9 +209,6 @@ input[type="text"] { padding: 10px 14px; font-size: 1rem; }
 .stop-btn { padding: 10px 16px; min-width: 68px; min-height: 44px; font-size: 0.85rem; }
 
 .controls-panel { gap: 10px; font-size: 0.8rem; }
-#mic-status { font-size: 0.75rem; }
-#model-badge { padding: 0 12px 6px 12px; font-size: 0.7rem; }
-.auto-update-badge { font-size: 0.7rem; }
 label { font-size: 0.8rem; }
 input[type="checkbox"] { width: 15px; height: 15px; }
 }
@@ -262,12 +252,10 @@ header { padding: 10px 14px; gap: 8px; }
 <header>
 <div class="header-top">
 <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Apri menu chat">☰</button>
-<h1>ZOE & AI</h1>
+<h1>Zoe</h1>
 <div class="controls-panel">
-<span id="mic-status">Clicca la sfera o la pagina per attivare "Zoe"</span>
 <label><input type="checkbox" id="ascolto-continu"> Ascolto "Zoe"</label>
 <label><input type="checkbox" id="voce-attiva" checked> Voce</label>
-<span class="auto-update-badge">Auto-Update Attivo</span>
 </div>
 </div>
 <div class="summary-cards">
@@ -295,8 +283,6 @@ header { padding: 10px 14px; gap: 8px; }
 <div class="monitor-item"><b>Tempo:</b> <span id="mon-tempo">0.0s</span></div>
 <div class="monitor-item"><b>Stato API:</b> <span id="mon-stato" style="color: #10b981;">Pronto</span></div>
 </div>
-
-<div id="model-badge"></div>
 
 <div class="input-footer">
 <div class="orb" id="orb" onclick="toggleMicrofono()" title="Clicca per parlare subito senza dire Zoe (o premi Alt+Z)"></div>
@@ -327,10 +313,8 @@ let monStartTime = 0;
 
 const chatContainer = document.getElementById("chat-container");
 const orb = document.getElementById("orb");
-const badgeEl = document.getElementById("model-badge");
 const voceAttiva = document.getElementById("voce-attiva");
 const ascoltoContinuuoCheck = document.getElementById("ascolto-continu");
-const micStatus = document.getElementById("mic-status");
 const statImmagini = document.getElementById("stat-immagini");
 const statImpegni = document.getElementById("stat-impegni");
 const stopBtn = document.getElementById("stop-btn");
@@ -444,7 +428,6 @@ abortController = null;
 document.querySelectorAll(".loading-box").forEach(el => el.remove());
 aggiornaMonitorFine(null, "Interrotto");
 orb.className = "orb";
-micStatus.textContent = "Interrotto";
 setControlsDisabled(false);
 setTimeout(() => { isStopped = false; }, 100);
 }
@@ -457,7 +440,6 @@ if (typeof window.speechSynthesis !== "undefined") {
 try { window.speechSynthesis.cancel(); } catch (e) {}
 }
 orb.className = "orb";
-micStatus.textContent = "Microfono in pausa";
 return;
 }
 isManualStop = false;
@@ -466,10 +448,8 @@ recognition.start();
 isListening = true;
 if (ascoltoDiretto) {
 orb.className = "orb listening";
-micStatus.textContent = "Ti ascolto...";
 } else {
 orb.className = "orb standby";
-micStatus.textContent = 'In attesa di "Zoe"...';
 }
 } catch (e) {
 isListening = false;
@@ -481,7 +461,6 @@ isListening = false;
 isManualStop = true;
 try { if (recognition) recognition.stop(); } catch (e) {}
 orb.className = "orb";
-micStatus.textContent = "Microfono in pausa";
 }
 
 function toggleMicrofono() {
@@ -561,7 +540,6 @@ if (comando.length > 0) {
 processaMessaggio(comando);
 } else {
 ascoltoDiretto = true;
-micStatus.textContent = "Dimmi pure...";
 }
 }
 };
@@ -571,20 +549,17 @@ isListening = false;
 if (isManualStop) {
 isManualStop = false;
 orb.className = "orb";
-micStatus.textContent = "Microfono in pausa";
 return;
 }
 if (!isSpeaking && !isStopped && (ascoltoContinuuoCheck.checked || ascoltoDiretto)) {
 setTimeout(avviaMicrofono, 150);
 } else if (!isSpeaking && !isStopped) {
 orb.className = "orb";
-micStatus.textContent = "Microfono in pausa";
 }
 };
 
 recognition.onerror = (event) => {
 if (event.error === "not-allowed") {
-micStatus.textContent = "Permesso microfono negato";
 ascoltoContinuuoCheck.checked = false;
 }
 if (!isSpeaking && !isStopped) {
@@ -592,7 +567,6 @@ isListening = false;
 isManualStop = true;
 try { if (recognition) recognition.stop(); } catch (e) {}
 orb.className = "orb";
-micStatus.textContent = "Microfono in pausa";
 }
 };
 }
@@ -650,7 +624,6 @@ try { window.speechSynthesis.cancel(); } catch (e) {}
 }
 isSpeaking = false;
 orb.className = "orb";
-micStatus.textContent = "Elaborazione...";
 
 if (isListening && recognition) {
 try { recognition.abort(); } catch (e) {}
@@ -785,7 +758,6 @@ htmlFinale += `<br><a href="${escapeHtml(dati.url)}" target="_blank" rel="noopen
 }
 
 aggiungiMessaggio(htmlFinale, "ai-msg");
-if (dati.modello) badgeEl.textContent = `Modello: ${dati.modello}`;
 aggiornaMonitorFine(dati);
 
 storicoChat.push({ role: "user", content: testo });
@@ -848,7 +820,6 @@ isSpeaking = true;
 isListening = false;
 try { if (recognition) recognition.stop(); } catch (e) {}
 orb.className = "orb speaking";
-micStatus.textContent = "Zoe sta parlando...";
 };
 msg.onend = () => {
 isSpeaking = false;
