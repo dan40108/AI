@@ -554,15 +554,16 @@ aggiungiMessaggio(escapeHtml(testo), "user-msg");
 const testoLower = testo.toLowerCase().trim();
 const isComandoVideoBreve =
 !isRichiestaTecnicaOModifica(testoLower) &&
-/^(metti|riproduci|apri il video|fammi vedere|fammi sentire|ascolta|suona)\b/i.test(testoLower);
+/^(metti|riproduci|apri il video|fammi vedere|fammi sentire|ascolta|suona|aprimi|fammi ascoltare|cerca su youtube)\b/i.test(testoLower);
 
 if (isComandoVideoBreve) {
-const ricerca = testo
-.replace(/^(metti|riproduci|apri il video|fammi vedere|fammi sentire|ascolta|suona)\s+(su\s+youtube|youtube)?\s*/i, "")
-.replace(/\b(su youtube|youtube|per favore)\b/gi, "")
+let ricerca = testo
+.replace(/^(metti|riproduci|apri il video|fammi vedere|fammi sentire|ascolta|suona|aprimi|fammi ascoltare|cerca su youtube)\s*/i, "")
+.replace(/\b(un video su|un video di|qualcosa su|su youtube|per favore|grazie|youtube)\b/gi, "")
+.replace(/\s+/g, " ")
 .trim();
 
-if (ricerca) {
+if (ricerca && ricerca.length <= 80) {
 const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(ricerca)}`;
 apriSchedaSicura(urlYt);
 const msgHtml = `Certo! Apro su YouTube: <b>"${escapeHtml(ricerca)}"</b><br><a href="${escapeHtml(urlYt)}" target="_blank" rel="noopener noreferrer" class="link-btn">Apri su YouTube</a>`;
@@ -573,7 +574,7 @@ return;
 }
 }
 
-if (!isRichiestaTecnicaOModifica(testoLower) && /^(cerca |cercami |mi cerchi |informazioni su )/i.test(testoLower)) {
+if (!isRichiestaTecnicaOModifica(testoLower) && !isComandoVideoBreve && /^(cerca |cercami |mi cerchi |informazioni su )/i.test(testoLower)) {
 const ricerca = testo.replace(/cerca su google|mi cerchi|cercami|cerca|informazioni su/gi, "").trim();
 if (ricerca) {
 const urlGoogle = `https://www.google.com/search?q=${encodeURIComponent(ricerca)}`;
