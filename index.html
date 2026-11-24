@@ -266,7 +266,7 @@ header { padding: 10px 14px; gap: 8px; }
 <div id="model-badge"></div>
 
 <div class="input-footer">
-<div class="orb" id="orb" onclick="toggleMicrofono()" title="Clicca per parlare subito senza dire Zoe"></div>
+<div class="orb" id="orb" onclick="toggleMicrofono()" title="Clicca per parlare subito senza dire Zoe (o premi Alt+Spazio)"></div>
 <div class="input-wrapper">
 <input type="text" id="testo-input" placeholder="Scrivi un messaggio o pronuncia 'Zoe...' ad alta voce" onkeydown="if(event.key==='Enter') inviaTesto()">
 <button class="send-btn" id="send-btn" onclick="inviaTesto()">Invia</button>
@@ -422,7 +422,28 @@ fermaMicrofono();
 }
 }
 
+function checkQuickMicParam() {
+const params = new URLSearchParams(window.location.search);
+if (params.get("mic") === "1") {
+ascoltoDiretto = true;
+ascoltoContinuuoCheck.checked = true;
+avviaMicrofono();
+}
+}
+
+window.addEventListener("keydown", (e) => {
+if (e.altKey && e.code === "Space") {
+e.preventDefault();
+toggleMicrofono();
+}
+});
+
 window.addEventListener("load", () => {
+const params = new URLSearchParams(window.location.search);
+if (params.get("mic") === "1") {
+checkQuickMicParam();
+return;
+}
 if (ascoltoContinuuoCheck.checked) avviaMicrofono();
 });
 document.body.addEventListener("click", (e) => {
