@@ -53,11 +53,11 @@ min-height: 44px; display: flex; align-items: center;
 }
 .chat-item:hover, .chat-item.active { background: rgba(255,255,255,0.05); color: var(--text-main); }
 
-main { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; margin-left: 280px; }
+main { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; margin-left: 280px; position: relative; }
 
 header {
 padding: 16px 20px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color);
-display: flex; flex-direction: column; gap: 14px; flex-shrink: 0;
+display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; position: relative; z-index: 20;
 }
 .header-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; }
@@ -69,6 +69,76 @@ border-radius: 10px; display: flex; flex-direction: column; gap: 4px; min-width:
 }
 .card-title { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-value { font-size: 1.1rem; font-weight: 600; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.dropdown-panel { position: relative; }
+.dropdown-summary {
+list-style: none;
+background: var(--bg-panel);
+border: 1px solid var(--border-color);
+border-radius: 10px;
+padding: 10px 14px;
+min-height: 40px;
+display: flex;
+align-items: center;
+gap: 8px;
+cursor: pointer;
+font-size: 0.85rem;
+font-weight: 600;
+color: var(--text-main);
+user-select: none;
+transition: background 0.2s, border-color 0.2s;
+}
+.dropdown-summary::-webkit-details-marker { display: none; }
+.dropdown-summary:hover { background: #18233d; border-color: #2c3e5c; }
+.dropdown-summary::after { content: "▾"; font-size: 0.8rem; color: var(--text-muted); transition: transform 0.2s; }
+.dropdown-panel[open] .dropdown-summary::after { transform: rotate(180deg); }
+
+.dropdown-body {
+position: absolute;
+top: calc(100% + 8px);
+right: 0;
+width: min(360px, calc(100vw - 24px));
+background: var(--bg-sidebar);
+border: 1px solid var(--border-color);
+border-radius: 12px;
+padding: 14px;
+box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+display: flex;
+flex-direction: column;
+gap: 12px;
+z-index: 40;
+}
+.dropdown-section-title {
+font-size: 0.7rem;
+text-transform: uppercase;
+letter-spacing: 0.6px;
+color: var(--text-muted);
+font-weight: 700;
+}
+.controls-panel { display: flex; align-items: center; gap: 14px; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
+
+#agent-monitor {
+padding: 10px 12px;
+background: var(--bg-panel);
+border: 1px solid var(--border-color);
+border-radius: 10px;
+display: flex;
+flex-direction: column;
+gap: 8px;
+font-size: 0.82rem;
+color: var(--text-muted);
+}
+.monitor-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+gap: 8px;
+min-width: 0;
+}
+.monitor-item b {
+color: var(--text-main);
+font-weight: 600;
+}
 
 #chat-container {
 flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px;
@@ -96,31 +166,6 @@ background: var(--accent); color: white; border-radius: 8px;
 text-decoration: none; font-size: 0.9rem; font-weight: 600; min-height: 44px; text-align: center;
 }
 .link-btn:hover { background: var(--accent-hover); }
-
-#agent-monitor {
-margin: 0 16px 10px 16px;
-padding: 10px 14px;
-background: var(--bg-panel);
-border: 1px solid var(--border-color);
-border-radius: 10px;
-display: flex;
-justify-content: space-between;
-align-items: center;
-gap: 12px;
-flex-wrap: wrap;
-font-size: 0.82rem;
-color: var(--text-muted);
-}
-.monitor-item {
-display: flex;
-align-items: center;
-gap: 6px;
-min-width: 0;
-}
-.monitor-item b {
-color: var(--text-main);
-font-weight: 600;
-}
 
 .input-footer {
 padding: 14px 16px; background: var(--bg-sidebar); border-top: 1px solid var(--border-color);
@@ -165,8 +210,6 @@ border-radius: 10px; font-size: 0.9rem; min-width: 72px; min-height: 48px;
 .stop-btn:active { background: var(--danger); }
 .stop-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.controls-panel { display: flex; align-items: center; gap: 14px; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
-
 label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 
@@ -196,10 +239,13 @@ h1 { font-size: 1.1rem; }
 .card-title { font-size: 0.65rem; }
 .card-value { font-size: 1rem; }
 
+.dropdown-summary { padding: 8px 12px; font-size: 0.8rem; }
+.dropdown-body { padding: 12px; }
+.controls-panel { gap: 10px; font-size: 0.8rem; }
+#agent-monitor { padding: 8px 10px; gap: 6px; font-size: 0.78rem; }
+
 #chat-container { padding: 16px 12px; gap: 12px; }
 .msg { padding: 11px 14px; border-radius: 12px; max-width: 90%; font-size: 0.95rem; line-height: 1.5; }
-
-#agent-monitor { margin: 0 12px 8px 12px; padding: 8px 12px; gap: 8px; font-size: 0.76rem; }
 
 .input-footer { padding: 12px; gap: 10px; }
 .orb { width: 44px; height: 44px; min-width: 44px; }
@@ -208,7 +254,6 @@ input[type="text"] { padding: 10px 14px; font-size: 1rem; }
 .send-btn { padding: 0 18px; min-width: 72px; min-height: 44px; font-size: 0.9rem; }
 .stop-btn { padding: 10px 16px; min-width: 68px; min-height: 44px; font-size: 0.85rem; }
 
-.controls-panel { gap: 10px; font-size: 0.8rem; }
 label { font-size: 0.8rem; }
 input[type="checkbox"] { width: 15px; height: 15px; }
 }
@@ -253,10 +298,22 @@ header { padding: 10px 14px; gap: 8px; }
 <div class="header-top">
 <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Apri menu chat">☰</button>
 <h1>Zoe</h1>
+<details class="dropdown-panel" id="menu-opzioni-agente">
+<summary class="dropdown-summary">Opzioni & Agente</summary>
+<div class="dropdown-body">
+<div class="dropdown-section-title">Impostazioni</div>
 <div class="controls-panel">
 <label><input type="checkbox" id="ascolto-continu"> Ascolto "Zoe"</label>
 <label><input type="checkbox" id="voce-attiva" checked> Voce</label>
 </div>
+<div class="dropdown-section-title">Monitoraggio Agente</div>
+<div id="agent-monitor" aria-live="polite">
+<div class="monitor-item"><b>Agente:</b> <span id="mon-agente">In attesa</span></div>
+<div class="monitor-item"><b>Tempo:</b> <span id="mon-tempo">0.0s</span></div>
+<div class="monitor-item"><b>Stato API:</b> <span id="mon-stato" style="color: #10b981;">Pronto</span></div>
+</div>
+</div>
+</details>
 </div>
 <div class="summary-cards">
 <div class="card">
@@ -276,12 +333,6 @@ header { padding: 10px 14px; gap: 8px; }
 
 <div id="chat-container">
 <div class="msg ai-msg">Ciao! Sono Zoe. Parlami liberamente dicendo il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b>, <b>"Zoe, che tempo fa oggi?"</b>, <b>"Zoe, disegna un gatto cyberpunk"</b>) oppure scrivimi qui sotto.</div>
-</div>
-
-<div id="agent-monitor" aria-live="polite">
-<div class="monitor-item"><b>Agente:</b> <span id="mon-agente">In attesa</span></div>
-<div class="monitor-item"><b>Tempo:</b> <span id="mon-tempo">0.0s</span></div>
-<div class="monitor-item"><b>Stato API:</b> <span id="mon-stato" style="color: #10b981;">Pronto</span></div>
 </div>
 
 <div class="input-footer">
@@ -322,6 +373,7 @@ const sendBtn = document.getElementById("send-btn");
 const testoInput = document.getElementById("testo-input");
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
+const menuOpzioniAgente = document.getElementById("menu-opzioni-agente");
 const monAgente = document.getElementById("mon-agente");
 const monTempo = document.getElementById("mon-tempo");
 const monStato = document.getElementById("mon-stato");
@@ -513,7 +565,10 @@ return;
 if (ascoltoContinuuoCheck.checked) avviaMicrofono();
 });
 document.body.addEventListener("click", (e) => {
-if (ascoltoContinuuoCheck.checked && !isListening && !isSpeaking && !e.target.closest("#orb") && !e.target.closest(".sidebar-toggle")) {
+if (menuOpzioniAgente && menuOpzioniAgente.open && !e.target.closest("#menu-opzioni-agente")) {
+menuOpzioniAgente.open = false;
+}
+if (ascoltoContinuuoCheck.checked && !isListening && !isSpeaking && !e.target.closest("#orb") && !e.target.closest(".sidebar-toggle") && !e.target.closest("#menu-opzioni-agente")) {
 avviaMicrofono();
 }
 });
@@ -576,6 +631,9 @@ const testo = testoInput.value.trim();
 if (!testo) return;
 testoInput.value = "";
 processaMessaggio(testo);
+if (menuOpzioniAgente && menuOpzioniAgente.open) {
+menuOpzioniAgente.open = false;
+}
 if (window.innerWidth <= 768 && sidebar.classList.contains("open")) {
 sidebar.classList.remove("open");
 sidebarToggle.textContent = "☰";
@@ -790,6 +848,9 @@ function nuovaChat() {
 chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
 storicoChat = [];
 scrollToBottom();
+if (menuOpzioniAgente && menuOpzioniAgente.open) {
+menuOpzioniAgente.open = false;
+}
 if (window.innerWidth <= 768) {
 sidebar.classList.remove("open");
 sidebarToggle.textContent = "☰";
