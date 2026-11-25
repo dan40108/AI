@@ -45,13 +45,27 @@ font-size: 0.95rem; min-height: 48px;
 }
 .new-chat-btn:hover { background: var(--accent-hover); }
 
-.chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .chat-item {
-padding: 12px 14px; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
-color: var(--text-muted); transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-min-height: 44px; display: flex; align-items: center;
+padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+color: var(--text-muted); transition: all 0.2s; min-height: 44px;
+display: flex; align-items: center; justify-content: space-between; gap: 8px;
+background: rgba(255,255,255,0.02); border: 1px solid transparent;
 }
-.chat-item:hover, .chat-item.active { background: rgba(255,255,255,0.05); color: var(--text-main); }
+.chat-item:hover, .chat-item.active {
+background: rgba(255,255,255,0.06); color: var(--text-main); border-color: var(--border-color);
+}
+.chat-item-label {
+flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.delete-chat-btn {
+background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+padding: 4px 6px; border-radius: 6px; font-size: 0.9rem; line-height: 1;
+flex-shrink: 0; transition: background 0.2s, color 0.2s;
+}
+.delete-chat-btn:hover {
+background: rgba(239, 68, 68, 0.16); color: var(--danger);
+}
 
 main { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; margin-left: 280px; position: relative; }
 
@@ -288,9 +302,7 @@ header { padding: 10px 14px; gap: 8px; }
 
 <aside id="sidebar">
 <button class="new-chat-btn" onclick="nuovaChat()">+ Nuova Chat</button>
-<div class="chat-list" id="chat-list">
-<div class="chat-item active">Chat Principale</div>
-</div>
+<div class="chat-list" id="chat-list"></div>
 </aside>
 
 <main>
@@ -347,8 +359,11 @@ header { padding: 10px 14px; gap: 8px; }
 
 <script>
 const SERVER_URL = "https://ai-ttmc.onrender.com";
+const STORAGE_ARCHIVIO_KEY = "zoe_chat_archiviate_v1";
 
 let storicoChat = [];
+let chatArchiviate = [];
+let chatSelezionataId = null;
 let conteggioImmagini = 0;
 let conteggioImpegni = 0;
 let isSpeaking = false;
@@ -363,6 +378,8 @@ let monTimerInterval = null;
 let monStartTime = 0;
 
 const chatContainer = document.getElementById("chat-container");
+const chatListEl = document.getElementById("chat-list");
+const statChatEl = document.getElementById("stat-chat");
 const orb = document.getElementById("orb");
 const voceAttiva = document.getElementById("voce-attiva");
 const ascoltoContinuuoCheck = document.getElementById("ascolto-continu");
@@ -392,6 +409,98 @@ loadVoices();
 if (window.speechSynthesis.onvoiceschanged !== undefined) {
 window.speechSynthesis.onvoiceschanged = loadVoices;
 }
+}
+
+function caricaArchivioLocale() {
+try {
+const raw = localStorage.getItem(STORAGE_ARCHIVIO_KEY);
+const parsed = raw ? JSON.parse(raw) : [];
+chatArchiviate = Array.isArray(parsed) ? parsed : [];
+} catch (err) {
+chatArchiviate = [];
+}
+renderizzaListaChat();
+}
+
+function salvaArchivioLocale() {
+try {
+localStorage.setItem(STORAGE_ARCHIVIO_KEY, JSON.stringify(chatArchiviate));
+} catch (err) {
+console.warn("Impossibile salvare in localStorage:", err);
+}
+}
+
+function renderizzaListaChat() {
+chatListEl.innerHTML = "";
+if (statChatEl) {
+statChatEl.textContent = String(chatArchiviate.length + 1);
+}
+
+if (!chatArchiviate.length) {
+const emptyDiv = document.createElement("div");
+emptyDiv.style.fontSize = "0.82rem";
+emptyDiv.style.color = "var(--text-muted)";
+emptyDiv.style.padding = "8px 10px";
+emptyDiv.textContent = "Nessuna chat archiviata.";
+chatListEl.appendChild(emptyDiv);
+return;
+}
+
+chatArchiviate.forEach((item) => {
+const row = document.createElement("div");
+row.className = `chat-item${chatSelezionataId === item.id ? " active" : ""}`;
+row.title = item.summary || item.title;
+
+const label = document.createElement("span");
+label.className = "chat-item-label";
+label.textContent = item.title;
+label.onclick = () => apriChatArchiviata(item.id);
+
+const delBtn = document.createElement("button");
+delBtn.type = "button";
+delBtn.className = "delete-chat-btn";
+delBtn.title = "Elimina chat";
+delBtn.setAttribute("aria-label", `Elimina ${item.title}`);
+delBtn.textContent = "🗑️";
+delBtn.onclick = (e) => {
+e.stopPropagation();
+eliminaChatArchiviata(item.id);
+};
+
+row.appendChild(label);
+row.appendChild(delBtn);
+chatListEl.appendChild(row);
+});
+}
+
+function apriChatArchiviata(id) {
+const trovata = chatArchiviate.find((c) => c.id === id);
+if (!trovata) return;
+chatSelezionataId = id;
+renderizzaListaChat();
+
+let html = `<div class="msg ai-msg"><b>Riassunto chat (${escapeHtml(trovata.ora || "")})</b><br><br>${escapeHtml(trovata.summary)}</div>`;
+if (Array.isArray(trovata.messaggi) && trovata.messaggi.length) {
+trovata.messaggi.forEach((m) => {
+const cls = m.role === "user" ? "user-msg" : "ai-msg";
+html += `<div class="msg ${cls}">${escapeHtml(m.content || "")}</div>`;
+});
+}
+chatContainer.innerHTML = html;
+scrollToBottom();
+if (window.innerWidth <= 768) {
+sidebar.classList.remove("open");
+sidebarToggle.textContent = "☰";
+}
+}
+
+function eliminaChatArchiviata(id) {
+chatArchiviate = chatArchiviate.filter((c) => c.id !== id);
+if (chatSelezionataId === id) {
+chatSelezionataId = null;
+}
+salvaArchivioLocale();
+renderizzaListaChat();
 }
 
 async function sincronizzaContestoIniziale() {
@@ -572,6 +681,7 @@ toggleMicrofono();
 });
 
 window.addEventListener("load", () => {
+caricaArchivioLocale();
 sincronizzaContestoIniziale();
 const params = new URLSearchParams(window.location.search);
 if (params.get("mic") === "1") {
@@ -862,9 +972,20 @@ scrollToBottom();
 
 async function nuovaChat() {
 const vecchioStorico = [...storicoChat];
+const oraLabel = new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+let riassuntoArchivio = vecchioStorico.length
+? vecchioStorico
+.filter((m) => m.role === "user")
+.map((m) => m.content)
+.slice(-2)
+.join(" — ")
+: "Nuova chat avviata";
+
 storicoChat = [];
-chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Aggiorno la memoria di contesto...</div>`;
+chatSelezionataId = null;
+chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Archiviazione riassunto in corso...</div>`;
 scrollToBottom();
+
 if (menuOpzioniAgente && menuOpzioniAgente.open) {
 menuOpzioniAgente.open = false;
 }
@@ -884,17 +1005,29 @@ testo_chiusura: "Sessione chiusa dall'utente tramite tasto Nuova Chat"
 });
 if (res.ok) {
 const dati = await res.json();
-const nuovoRiassunto = dati && dati.current_context_summary;
-chatContainer.innerHTML = nuovoRiassunto
-? `<div class="msg ai-msg">Nuova chat avviata! Contesto salvato:<br><br><i>"${escapeHtml(nuovoRiassunto)}"</i><br><br>Dimmi pure!</div>`
-: `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
-} else {
-chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
+if (dati && dati.current_context_summary) {
+riassuntoArchivio = dati.current_context_summary;
+}
 }
 } catch (err) {
 console.error("Errore chiamata /nuova-sessione:", err);
-chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
 }
+
+const titoloBreve = riassuntoArchivio.length > 36
+? `${riassuntoArchivio.slice(0, 36).trim()}...`
+: riassuntoArchivio;
+
+chatArchiviate.unshift({
+id: `chat_${Date.now()}`,
+title: `${oraLabel} · ${titoloBreve}`,
+summary: riassuntoArchivio,
+ora: oraLabel,
+messaggi: vecchioStorico
+});
+salvaArchivioLocale();
+renderizzaListaChat();
+
+chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata! Riassunto archiviato nella barra laterale.<br><br><i>"${escapeHtml(riassuntoArchivio)}"</i><br><br>Dimmi pure!</div>`;
 scrollToBottom();
 }
 
