@@ -9,6 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from litellm import completion
 from pydantic import BaseModel
 
+from firebase_db import (
+    get_current_context,
+    get_user_profile,
+    overwrite_current_context,
+)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -55,6 +61,11 @@ class Richiesta(BaseModel):
 class RichiestaAutoAggiorna(BaseModel):
     file: str
     istruzione: str
+
+
+class RichiestaNuovaSessione(BaseModel):
+    testo_chiusura: str = ""
+    storico: list = []
 
 
 def _headers_github() -> dict:
@@ -327,9 +338,80 @@ async def esegui_modello(modelli: list[str], messaggi: list[dict], timeout_sec: 
     }
 
 
+def _carica_memoria_sicura() -> tuple[dict, dict]:
+    try:
+        profilo = get_user_profile() or {}
+    except Exception:
+        profilo = {}
+    try:
+        contesto = get_current_context() or {}
+    except Exception:
+        contesto = {}
+    return profilo, contesto
+
+
+async def _aggiorna_rolling_summary(testo_utente: str, risposta_zoe: str, contesto_attuale: dict):
+    vecchio_riassunto = (contesto_attuale.get("summary") or "").strip()
+    prompt_riassunto = (
+        "Crea un riassunto brevissimo e aggiornato (massimo 4-5 frasi, solo testo piano, niente emoji o asterischi) "
+        "dello stato attuale della conversazione per riprendere il filo in futuro, sovrascrivendo il vecchio riassunto.\n\n"
+        f"Riassunto precedente:\n{vecchio_riassunto or 'Nessuno'}\n\n"
+        f"Ultimo messaggio utente: {testo_utente}\n"
+        f"Ultima risposta Zoe: {risposta_zoe}"
+    )
+    try:
+        res = await esegui_modello(
+            ["groq/llama-3.3-70b-versatile", "gemini/gemini-2.0-flash", "openrouter/openrouter/free"],
+            [{"role": "user", "content": prompt_riassunto}],
+            timeout_sec=25.0,
+        )
+        nuovo_riassunto = (res.get("risposta") or "").strip()
+        if nuovo_riassunto:
+            await asyncio.to_thread(overwrite_current_context, nuovo_riassunto, "sessione_attiva")
+    except Exception:
+        pass
+
+
 @app.get("/")
 async def home():
     return {"stato": "Zoe Multi-Agent Evolution System Online"}
+
+
+@app.get("/contesto")
+async def stato_contesto():
+    profilo, contesto = await asyncio.to_thread(_carica_memoria_sicura)
+    return {
+        "user_profile": profilo,
+        "current_context": contesto,
+    }
+
+
+@app.post("/nuova-sessione")
+async def nuova_sessione(req: RichiestaNuovaSessione):
+    _, contesto = await asyncio.to_thread(_carica_memoria_sicura)
+    vecchio_riassunto = (contesto.get("summary") or "").strip()
+
+    storico_testo = "\n".join(
+        f"{m.get('role', 'user')}: {m.get('content', '')}" for m in (req.storico or [])[-8:]
+    )
+    prompt_nuova = (
+        "Genera un nuovo riassunto sintetico e pulito (massimo 4 frasi, solo testo piano, niente emoji o asterischi) "
+        "che sostituisce completamente il precedente per iniziare una nuova sessione riprendendo i punti chiave.\n\n"
+        f"Precedente: {vecchio_riassunto or 'Nessuno'}\n"
+        f"Storico recente:\n{storico_testo or req.testo_chiusura or 'Sessione azzerata'}"
+    )
+    try:
+        res = await esegui_modello(
+            ["groq/llama-3.3-70b-versatile", "gemini/gemini-2.0-flash", "openrouter/openrouter/free"],
+            [{"role": "user", "content": prompt_nuova}],
+            timeout_sec=25.0,
+        )
+        nuovo_riassunto = (res.get("risposta") or "Nuova sessione avviata.").strip()
+    except Exception:
+        nuovo_riassunto = req.testo_chiusura.strip() or "Nuova sessione avviata."
+
+    await asyncio.to_thread(overwrite_current_context, nuovo_riassunto, "nuova_sessione")
+    return {"stato": "ok", "current_context_summary": nuovo_riassunto}
 
 
 @app.post("/auto-aggiorna")
@@ -438,6 +520,16 @@ async def chiedi(req: Richiesta):
             },
         }
 
+    profilo, contesto = await asyncio.to_thread(_carica_memoria_sicura)
+    riassunto_attivo = (contesto.get("summary") or "").strip()
+    blocco_memoria = ""
+    if profilo or riassunto_attivo:
+        blocco_memoria = (
+            "\n\nMemoria persistente (usa solo se utile al contesto):\n"
+            f"- Profilo utente: {profilo if profilo else 'Non impostato'}\n"
+            f"- Contesto sessione corrente: {riassunto_attivo if riassunto_attivo else 'Nessuno'}"
+        )
+
     is_auto_apply = any(k in testo_lower for k in [
         "aggiorna il tuo codice", "modifica il tuo codice", "applica la modifica",
         "scrivi nel file", "salva su github", "auto-aggiorna", "fai il commit"
@@ -465,6 +557,7 @@ async def chiedi(req: Richiesta):
             "Sei l'Agente Meta-Programmatore di Zoe. Il tuo obiettivo è analizzare il codice, "
             "progettare miglioramenti strutturali, scrivere codice pulito, commentato e privo di errori "
             "in Python, FastAPI o JavaScript. Non usare mai emoji o asterischi. Rispondi in modo tecnico."
+            f"{blocco_memoria}"
         )
         modelli = [
             "groq/llama-3.3-70b-versatile",
@@ -480,6 +573,7 @@ async def chiedi(req: Richiesta):
         system_prompt = (
             "Ti chiami Zoe e sei un'assistente di co-working intelligente e informale. "
             "Non usare emoji o asterischi nella voce. Rispondi in modo naturale e amichevole in italiano."
+            f"{blocco_memoria}"
         )
         modelli = [
             "groq/llama-3.3-70b-versatile",
@@ -493,7 +587,9 @@ async def chiedi(req: Richiesta):
         timeout_richiesta = 60.0
 
     try:
-        return await esegui_modello(modelli, messaggi, timeout_sec=timeout_richiesta)
+        risultato = await esegui_modello(modelli, messaggi, timeout_sec=timeout_richiesta)
+        asyncio.create_task(_aggiorna_rolling_summary(req.testo, risultato.get("risposta", ""), contesto))
+        return risultato
     except asyncio.TimeoutError:
         return {
             "risposta": "Errore critico: Nessun agente ha risposto entro 60 secondi. È colpa di Gemini e dei server cloud che stanno impiegando troppo tempo.",
