@@ -332,7 +332,7 @@ header { padding: 10px 14px; gap: 8px; }
 </header>
 
 <div id="chat-container">
-<div class="msg ai-msg">Ciao! Sono Zoe. Parlami liberamente dicendo il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b>, <b>"Zoe, che tempo fa oggi?"</b>, <b>"Zoe, disegna un gatto cyberpunk"</b>) oppure scrivimi qui sotto.</div>
+<div class="msg ai-msg" id="welcome-msg">Ciao! Sono Zoe. Parlami liberamente dicendo il mio nome (es. <b>"Zoe, metti i Rolling Stones"</b>, <b>"Zoe, che tempo fa oggi?"</b>, <b>"Zoe, disegna un gatto cyberpunk"</b>) oppure scrivimi qui sotto.</div>
 </div>
 
 <div class="input-footer">
@@ -391,6 +391,21 @@ const loadVoices = () => { vociCache = window.speechSynthesis.getVoices(); };
 loadVoices();
 if (window.speechSynthesis.onvoiceschanged !== undefined) {
 window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+}
+
+async function sincronizzaContestoIniziale() {
+try {
+const res = await fetch(`${SERVER_URL}/contesto`);
+if (!res.ok) return;
+const dati = await res.json();
+const summary = dati && dati.current_context && dati.current_context.summary;
+const welcomeMsg = document.getElementById("welcome-msg");
+if (summary && welcomeMsg) {
+welcomeMsg.innerHTML = `Ciao! Sono Zoe. Riprendo dal nostro ultimo contesto sincronizzato:<br><br><i>"${escapeHtml(summary)}"</i><br><br>Dimmi pure come vuoi continuare!`;
+}
+} catch (err) {
+console.warn("Sync contesto iniziale non disponibile:", err);
 }
 }
 
@@ -557,6 +572,7 @@ toggleMicrofono();
 });
 
 window.addEventListener("load", () => {
+sincronizzaContestoIniziale();
 const params = new URLSearchParams(window.location.search);
 if (params.get("mic") === "1") {
 checkQuickMicParam();
@@ -844,9 +860,10 @@ chatContainer.appendChild(div);
 scrollToBottom();
 }
 
-function nuovaChat() {
-chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
+async function nuovaChat() {
+const vecchioStorico = [...storicoChat];
 storicoChat = [];
+chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Aggiorno la memoria di contesto...</div>`;
 scrollToBottom();
 if (menuOpzioniAgente && menuOpzioniAgente.open) {
 menuOpzioniAgente.open = false;
@@ -855,6 +872,30 @@ if (window.innerWidth <= 768) {
 sidebar.classList.remove("open");
 sidebarToggle.textContent = "☰";
 }
+
+try {
+const res = await fetch(`${SERVER_URL}/nuova-sessione`, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({
+storico: vecchioStorico,
+testo_chiusura: "Sessione chiusa dall'utente tramite tasto Nuova Chat"
+})
+});
+if (res.ok) {
+const dati = await res.json();
+const nuovoRiassunto = dati && dati.current_context_summary;
+chatContainer.innerHTML = nuovoRiassunto
+? `<div class="msg ai-msg">Nuova chat avviata! Contesto salvato:<br><br><i>"${escapeHtml(nuovoRiassunto)}"</i><br><br>Dimmi pure!</div>`
+: `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
+} else {
+chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
+}
+} catch (err) {
+console.error("Errore chiamata /nuova-sessione:", err);
+chatContainer.innerHTML = `<div class="msg ai-msg">Nuova chat avviata. Dimmi pure!</div>`;
+}
+scrollToBottom();
 }
 
 function parla(testo) {
